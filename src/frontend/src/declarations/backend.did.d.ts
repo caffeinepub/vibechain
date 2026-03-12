@@ -30,6 +30,15 @@ export interface Vibe {
   'timestamp' : Time,
   'artistName' : string,
 }
+export interface MoodSong {
+  'id' : bigint,
+  'mood' : string,
+  'title' : string,
+  'artist' : string,
+  'videoId' : string,
+  'addedBy' : Principal,
+  'timestamp' : Time,
+}
 export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
   'registerCaller' : ActorMethod<[], undefined>,
@@ -52,6 +61,10 @@ export interface _SERVICE {
   'postVibe' : ActorMethod<[string, string, string, [] | [string]], undefined>,
   'saveCallerUserProfile' : ActorMethod<[Profile], undefined>,
   'updateProfile' : ActorMethod<[string, string], undefined>,
+  'addMoodSong' : ActorMethod<[string, string, string, string], bigint>,
+  'getMoodSongs' : ActorMethod<[string], Array<MoodSong>>,
+  'deleteMoodSong' : ActorMethod<[bigint], undefined>,
+  'getPublicUsername' : ActorMethod<[Principal], [] | [string]>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

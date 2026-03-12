@@ -22,6 +22,15 @@ export interface Vibe {
     timestamp: Time;
     artistName: string;
 }
+export interface MoodSong {
+    id: bigint;
+    mood: string;
+    title: string;
+    artist: string;
+    videoId: string;
+    addedBy: Principal;
+    timestamp: Time;
+}
 export type Time = bigint;
 export interface Profile {
     bio: string;
@@ -53,5 +62,9 @@ export interface backendInterface {
     postVibe(mood: string, songTitle: string, artistName: string, message: string | null): Promise<void>;
     saveCallerUserProfile(profile: Profile): Promise<void>;
     updateProfile(username: string, bio: string): Promise<void>;
+    addMoodSong(mood: string, title: string, artist: string, videoId: string): Promise<bigint>;
+    getMoodSongs(mood: string): Promise<Array<MoodSong>>;
+    deleteMoodSong(songId: bigint): Promise<void>;
+    getPublicUsername(user: Principal): Promise<string | null>;
     _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
 }

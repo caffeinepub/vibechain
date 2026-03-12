@@ -136,6 +136,10 @@ export interface backendInterface {
     postVibe(mood: string, songTitle: string, artistName: string, message: string | null): Promise<void>;
     saveCallerUserProfile(profile: Profile): Promise<void>;
     updateProfile(username: string, bio: string): Promise<void>;
+    addMoodSong(mood: string, title: string, artist: string, videoId: string): Promise<bigint>;
+    getMoodSongs(mood: string): Promise<Array<{id: bigint; mood: string; title: string; artist: string; videoId: string; addedBy: Principal; timestamp: bigint}>>;
+    deleteMoodSong(songId: bigint): Promise<void>;
+    getPublicUsername(user: Principal): Promise<string | null>;
 }
 import type { Profile as _Profile, Time as _Time, UserRole as _UserRole, Vibe as _Vibe } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
@@ -432,6 +436,62 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.updateProfile(arg0, arg1);
             return result;
+        }
+    }
+    async addMoodSong(arg0: string, arg1: string, arg2: string, arg3: string): Promise<bigint> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.addMoodSong(arg0, arg1, arg2, arg3);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.addMoodSong(arg0, arg1, arg2, arg3);
+            return result;
+        }
+    }
+    async getMoodSongs(arg0: string): Promise<Array<any>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getMoodSongs(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getMoodSongs(arg0);
+            return result;
+        }
+    }
+    async deleteMoodSong(arg0: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteMoodSong(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteMoodSong(arg0);
+            return result;
+        }
+    }
+    async getPublicUsername(arg0: Principal): Promise<string | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getPublicUsername(arg0);
+                return result.length === 0 ? null : result[0];
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getPublicUsername(arg0);
+            return result.length === 0 ? null : result[0];
         }
     }
 }

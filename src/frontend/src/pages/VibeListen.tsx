@@ -17,7 +17,12 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { Suspense, lazy, useEffect, useState } from "react";
+import type {
+  backendInterface as FullBackendInterface,
+  MoodSong,
+} from "../backend.d";
 import { useMiniPlayer } from "../context/MiniPlayerContext";
+import { useActor } from "../hooks/useActor";
 
 const FaceEmotionDetector = lazy(
   () => import("../components/FaceEmotionDetector"),
@@ -39,28 +44,6 @@ interface MoodConfig {
   bgColor: string;
   description: string;
   songs: Song[];
-}
-
-interface UserSong {
-  mood: string;
-  title: string;
-  artist: string;
-  videoId: string;
-}
-
-const USER_SONGS_KEY = "vibechain_user_songs";
-
-function loadUserSongs(): UserSong[] {
-  try {
-    const raw = localStorage.getItem(USER_SONGS_KEY);
-    return raw ? (JSON.parse(raw) as UserSong[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveUserSongs(songs: UserSong[]) {
-  localStorage.setItem(USER_SONGS_KEY, JSON.stringify(songs));
 }
 
 function extractYouTubeId(input: string): string | null {
@@ -560,27 +543,62 @@ const EMPTY_FORM: AddSongFormState = {
 export default function VibeListen() {
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<FavSong[]>(loadFavorites);
-  const [userSongs, setUserSongs] = useState<UserSong[]>(loadUserSongs);
+  const [backendSongs, setBackendSongs] = useState<MoodSong[]>([]);
+  const [loadingBackendSongs, setLoadingBackendSongs] = useState(false);
   const [showAllFavorites, setShowAllFavorites] = useState(false);
   const [shuffledSong, setShuffledSong] = useState<Song | null>(null);
   const [showFaceDetector, setShowFaceDetector] = useState(false);
   // Per-mood add form open state
   const [addFormOpen, setAddFormOpen] = useState(false);
   const [addForm, setAddForm] = useState<AddSongFormState>(EMPTY_FORM);
+  const [addedByUsernames, setAddedByUsernames] = useState<
+    Record<string, string>
+  >({});
 
   const {
     playingVideoId,
     playSong: ctxPlaySong,
     stopPlaying,
   } = useMiniPlayer();
+  const { actor: _actor } = useActor();
+  const actor = _actor as unknown as FullBackendInterface | null;
 
   useEffect(() => {
     saveFavorites(favorites);
   }, [favorites]);
 
+  // Fetch backend songs when mood changes
   useEffect(() => {
-    saveUserSongs(userSongs);
-  }, [userSongs]);
+    if (!selectedMood || !actor) return;
+    setLoadingBackendSongs(true);
+    actor
+      .getMoodSongs(selectedMood)
+      .then(async (songs) => {
+        setBackendSongs(songs);
+        // Fetch usernames for unique addedBy principals
+        const uniquePrincipals = [
+          ...new Set(songs.map((s) => s.addedBy.toString())),
+        ];
+        const entries = await Promise.all(
+          uniquePrincipals.map(async (p) => {
+            try {
+              const name = await actor.getPublicUsername(
+                songs.find((s) => s.addedBy.toString() === p)!.addedBy,
+              );
+              return [p, name?.trim() ? `@${name}` : `${p.slice(0, 8)}...`] as [
+                string,
+                string,
+              ];
+            } catch {
+              return [p, `${p.slice(0, 8)}...`] as [string, string];
+            }
+          }),
+        );
+        setAddedByUsernames(Object.fromEntries(entries));
+      })
+      .catch(() => setBackendSongs([]))
+      .finally(() => setLoadingBackendSongs(false));
+  }, [selectedMood, actor]);
 
   const toggleFavorite = (song: Song, mood: string) => {
     setFavorites((prev) => {
@@ -595,16 +613,22 @@ export default function VibeListen() {
     setFavorites((prev) => prev.filter((f) => f.videoId !== videoId));
   };
 
-  const removeUserSong = (videoId: string) => {
-    setUserSongs((prev) => prev.filter((s) => s.videoId !== videoId));
+  const removeUserSong = async (videoId: string, songId: bigint) => {
+    try {
+      if (actor) await actor.deleteMoodSong(songId);
+      setBackendSongs((prev) => prev.filter((s) => s.videoId !== videoId));
+    } catch (err) {
+      console.error("Failed to delete song", err);
+    }
   };
 
   const currentMood = selectedMood ? MOODS[selectedMood] : null;
 
   // Merged song list (curated + user) for current mood
-  const currentUserSongs = selectedMood
-    ? userSongs.filter((s) => s.mood === selectedMood)
-    : [];
+  const currentUserSongs: (MoodSong & Song)[] = backendSongs.map((s) => ({
+    ...s,
+    lang: undefined,
+  }));
 
   const mergedSongs: Song[] = currentMood
     ? [...currentMood.songs, ...currentUserSongs]
@@ -640,7 +664,7 @@ export default function VibeListen() {
     }
   };
 
-  const handleAddSong = () => {
+  const handleAddSong = async () => {
     const { title, artist, url } = addForm;
     if (!title.trim() || !artist.trim() || !url.trim()) {
       setAddForm((f) => ({ ...f, error: "Please fill in all fields." }));
@@ -664,15 +688,25 @@ export default function VibeListen() {
       }));
       return;
     }
-    setUserSongs((prev) => [
-      ...prev,
-      {
-        mood: selectedMood,
-        title: title.trim(),
-        artist: artist.trim(),
-        videoId,
-      },
-    ]);
+    setAddForm((f) => ({ ...f, error: "" }));
+    try {
+      if (actor) {
+        await actor.addMoodSong(
+          selectedMood,
+          title.trim(),
+          artist.trim(),
+          videoId,
+        );
+        const songs = await actor.getMoodSongs(selectedMood);
+        setBackendSongs(songs);
+      }
+    } catch (_e) {
+      setAddForm((f) => ({
+        ...f,
+        error: "Failed to add song. Please try again.",
+      }));
+      return;
+    }
     setAddForm(EMPTY_FORM);
     setAddFormOpen(false);
   };
@@ -1209,6 +1243,15 @@ export default function VibeListen() {
               })}
 
               {/* User-added songs */}
+              {loadingBackendSongs && (
+                <div
+                  className="flex items-center gap-2 py-3 px-4 text-xs text-muted-foreground"
+                  data-ocid="vibe-listen.songs.loading_state"
+                >
+                  <span className="animate-spin inline-block w-3 h-3 border border-current border-t-transparent rounded-full" />
+                  Loading community songs...
+                </div>
+              )}
               <AnimatePresence>
                 {currentUserSongs.map((song, uIdx) => {
                   const globalIdx = currentMood.songs.length + uIdx;
@@ -1309,7 +1352,12 @@ export default function VibeListen() {
                             }}
                           >
                             <UserPlus className="w-2.5 h-2.5" />
-                            You
+                            Community
+                            {addedByUsernames[song.addedBy.toString()] && (
+                              <span className="opacity-80">
+                                · {addedByUsernames[song.addedBy.toString()]}
+                              </span>
+                            )}
                           </span>
                         </div>
                         <p className="text-xs text-muted-foreground truncate mt-0.5">
@@ -1371,7 +1419,7 @@ export default function VibeListen() {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            removeUserSong(song.videoId);
+                            removeUserSong(song.videoId, song.id);
                           }}
                           data-ocid={`vibe-listen.user_song.delete_button.${uIdx + 1}`}
                           className="p-2 rounded-lg hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"

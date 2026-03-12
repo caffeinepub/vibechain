@@ -29,6 +29,15 @@ export const Vibe = IDL.Record({
   'timestamp' : Time,
   'artistName' : IDL.Text,
 });
+export const MoodSong = IDL.Record({
+  'id' : IDL.Nat,
+  'mood' : IDL.Text,
+  'title' : IDL.Text,
+  'artist' : IDL.Text,
+  'videoId' : IDL.Text,
+  'addedBy' : IDL.Principal,
+  'timestamp' : Time,
+});
 export const Profile = IDL.Record({ 'bio' : IDL.Text, 'username' : IDL.Text });
 
 export const idlService = IDL.Service({
@@ -65,6 +74,10 @@ export const idlService = IDL.Service({
     ),
   'saveCallerUserProfile' : IDL.Func([Profile], [], []),
   'updateProfile' : IDL.Func([IDL.Text, IDL.Text], [], []),
+  'addMoodSong' : IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
+  'getMoodSongs' : IDL.Func([IDL.Text], [IDL.Vec(MoodSong)], ['query']),
+  'deleteMoodSong' : IDL.Func([IDL.Nat], [], []),
+  'getPublicUsername' : IDL.Func([IDL.Principal], [IDL.Opt(IDL.Text)], ['query']),
 });
 
 export const idlInitArgs = [];
@@ -90,6 +103,15 @@ export const idlFactory = ({ IDL }) => {
     'message' : IDL.Opt(IDL.Text),
     'timestamp' : Time,
     'artistName' : IDL.Text,
+  });
+  const MoodSong = IDL.Record({
+    'id' : IDL.Nat,
+    'mood' : IDL.Text,
+    'title' : IDL.Text,
+    'artist' : IDL.Text,
+    'videoId' : IDL.Text,
+    'addedBy' : IDL.Principal,
+    'timestamp' : Time,
   });
   const Profile = IDL.Record({ 'bio' : IDL.Text, 'username' : IDL.Text });
   
@@ -127,6 +149,10 @@ export const idlFactory = ({ IDL }) => {
       ),
     'saveCallerUserProfile' : IDL.Func([Profile], [], []),
     'updateProfile' : IDL.Func([IDL.Text, IDL.Text], [], []),
+    'addMoodSong' : IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
+    'getMoodSongs' : IDL.Func([IDL.Text], [IDL.Vec(MoodSong)], ['query']),
+    'deleteMoodSong' : IDL.Func([IDL.Nat], [], []),
+    'getPublicUsername' : IDL.Func([IDL.Principal], [IDL.Opt(IDL.Text)], ['query']),
   });
 };
 

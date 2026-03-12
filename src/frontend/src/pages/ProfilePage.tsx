@@ -115,13 +115,18 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   {editing ? (
-                    <Input
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      className="font-semibold text-lg bg-muted/30 border-border/50 w-48"
-                      placeholder="Your username"
-                      data-ocid="profile.input"
-                    />
+                    <>
+                      <Input
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        className="font-semibold text-lg bg-muted/30 border-border/50 w-48"
+                        placeholder="Your display name / user ID"
+                        data-ocid="profile.input"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        This name is shown publicly next to songs you add
+                      </p>
+                    </>
                   ) : (
                     <h2 className="text-xl font-semibold">
                       {profile?.username || shortPrincipal}
@@ -199,7 +204,6 @@ export default function ProfilePage() {
         <h2 className="text-xl font-display font-bold mb-5 gradient-text">
           My Vibes
         </h2>
-
         {vibesLoading && (
           <div className="space-y-4" data-ocid="profile.loading_state">
             {VIBE_SKELETON_KEYS.map((k) => (
@@ -216,7 +220,6 @@ export default function ProfilePage() {
             ))}
           </div>
         )}
-
         {!vibesLoading && sortedVibes.length === 0 && (
           <div className="text-center py-16" data-ocid="profile.empty_state">
             <p className="text-4xl mb-3">🎵</p>
@@ -231,7 +234,6 @@ export default function ProfilePage() {
             </Link>
           </div>
         )}
-
         {!vibesLoading && sortedVibes.length > 0 && (
           <div className="space-y-4">
             <AnimatePresence mode="popLayout">

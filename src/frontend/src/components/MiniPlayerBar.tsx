@@ -31,6 +31,7 @@ interface YTPlayer {
   getCurrentTime(): number;
   getDuration(): number;
   getVideoLoadedFraction(): number;
+  seekTo(seconds: number, allowSeekAhead: boolean): void;
   destroy(): void;
 }
 
@@ -58,10 +59,14 @@ export default function MiniPlayerBar() {
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YTPlayer | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
   const [buffered, setBuffered] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [hoverPos, setHoverPos] = useState<number | null>(null);
+  const durationRef = useRef(0);
+  durationRef.current = duration;
   const isPlayingRef = useRef(isPlaying);
   isPlayingRef.current = isPlaying;
   const playNextRef = useRef(playNext);
@@ -94,6 +99,50 @@ export default function MiniPlayerBar() {
       }
     }, 500);
   }, [stopPolling]);
+
+  const handleSeek = useCallback(
+    (
+      e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>,
+    ) => {
+      const bar = progressBarRef.current;
+      const p = playerRef.current;
+      const dur = durationRef.current;
+      if (!bar || !p || dur <= 0) return;
+      const rect = bar.getBoundingClientRect();
+      let clientX: number;
+      if ("touches" in e) {
+        clientX = e.touches[0]?.clientX ?? e.changedTouches[0]?.clientX ?? 0;
+      } else {
+        clientX = e.clientX;
+      }
+      const ratio = Math.max(
+        0,
+        Math.min(1, (clientX - rect.left) / rect.width),
+      );
+      try {
+        p.seekTo(ratio * dur, true);
+        setProgress(ratio);
+        setCurrentTime(ratio * dur);
+      } catch (_) {
+        /* ignore */
+      }
+    },
+    [],
+  );
+
+  const handleBarMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const bar = progressBarRef.current;
+      if (!bar) return;
+      const rect = bar.getBoundingClientRect();
+      const ratio = Math.max(
+        0,
+        Math.min(1, (e.clientX - rect.left) / rect.width),
+      );
+      setHoverPos(ratio);
+    },
+    [],
+  );
 
   // Load YT API once
   useEffect(() => {
@@ -212,10 +261,43 @@ export default function MiniPlayerBar() {
             boxShadow: `0 -4px 32px ${currentMoodConfig.glowColor}, 0 -1px 0 ${currentMoodConfig.borderColor}`,
           }}
         >
-          {/* Live progress bar at top edge */}
+          {/* Seekable live progress bar at top edge */}
           <div
-            className="absolute top-0 left-0 right-0 h-1 overflow-hidden"
-            style={{ borderRadius: 0, zIndex: 10 }}
+            ref={progressBarRef}
+            data-ocid="mini-player.canvas_target"
+            className="absolute top-0 left-0 right-0 overflow-hidden"
+            style={{
+              height: 6,
+              borderRadius: 0,
+              zIndex: 10,
+              cursor: duration > 0 ? "pointer" : "default",
+            }}
+            onClick={handleSeek}
+            onTouchEnd={handleSeek}
+            onMouseMove={handleBarMouseMove}
+            onMouseLeave={() => setHoverPos(null)}
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (!playerRef.current || durationRef.current <= 0) return;
+              const step = 0.05;
+              if (e.key === "ArrowRight") {
+                const next = Math.min(1, progress + step);
+                playerRef.current.seekTo(next * durationRef.current, true);
+                setProgress(next);
+                setCurrentTime(next * durationRef.current);
+              }
+              if (e.key === "ArrowLeft") {
+                const next = Math.max(0, progress - step);
+                playerRef.current.seekTo(next * durationRef.current, true);
+                setProgress(next);
+                setCurrentTime(next * durationRef.current);
+              }
+            }}
+            aria-label="Seek"
+            role="slider"
+            aria-valuenow={Math.round(progress * 100)}
+            aria-valuemin={0}
+            aria-valuemax={100}
           >
             {/* Buffer layer */}
             <div
@@ -237,6 +319,44 @@ export default function MiniPlayerBar() {
                 transition: "width 0.5s linear",
               }}
             />
+            {/* Hover preview */}
+            {hoverPos !== null && duration > 0 && (
+              <>
+                <div
+                  className="absolute top-0 left-0 h-full pointer-events-none"
+                  style={{
+                    width: `${hoverPos * 100}%`,
+                    background: currentMoodConfig.textColor,
+                    opacity: 0.15,
+                  }}
+                />
+                <div
+                  className="absolute -top-7 text-xs px-1.5 py-0.5 rounded pointer-events-none font-mono"
+                  style={{
+                    left: `clamp(0px, calc(${hoverPos * 100}% - 18px), calc(100% - 36px))`,
+                    background: currentMoodConfig.bgColor,
+                    color: currentMoodConfig.textColor,
+                    border: `1px solid ${currentMoodConfig.borderColor}`,
+                    fontSize: 10,
+                  }}
+                >
+                  {formatTime(hoverPos * duration)}
+                </div>
+              </>
+            )}
+            {/* Thumb dot */}
+            {duration > 0 && (
+              <div
+                className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full pointer-events-none"
+                style={{
+                  left: `clamp(0px, calc(${progress * 100}% - 6px), calc(100% - 12px))`,
+                  background: currentMoodConfig.textColor,
+                  boxShadow: `0 0 4px ${currentMoodConfig.glowColor}`,
+                  opacity: hoverPos !== null ? 1 : 0.7,
+                  transition: "left 0.5s linear",
+                }}
+              />
+            )}
           </div>
 
           {/* Hidden YT player container */}

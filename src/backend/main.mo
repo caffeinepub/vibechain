@@ -41,6 +41,16 @@ actor {
     members : [Principal];
   };
 
+  type MoodSong = {
+    id : Nat;
+    mood : Text;
+    title : Text;
+    artist : Text;
+    videoId : Text;
+    addedBy : Principal;
+    timestamp : Time.Time;
+  };
+
   // Comparison module for Vibe to sort by timestamp
   module Vibe {
     public func compare(v1 : Vibe, v2 : Vibe) : Order.Order {
@@ -57,6 +67,9 @@ actor {
 
   let vibes = Map.empty<Nat, Vibe>();
   let circles = Map.empty<Text, Circle>();
+
+  let moodSongs = Map.empty<Nat, MoodSong>();
+  var nextMoodSongId = 0;
 
   // Profile Management
   public query ({ caller }) func getCallerUserProfile() : async ?Profile {
@@ -153,6 +166,59 @@ actor {
           Runtime.trap("Unauthorized: Can only delete your own vibes");
         };
         vibes.remove(vibeId);
+      };
+    };
+  };
+
+  // Mood Songs (user-added songs visible to all)
+  public shared ({ caller }) func addMoodSong(mood : Text, title : Text, artist : Text, videoId : Text) : async Nat {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can add songs");
+    };
+
+    let song : MoodSong = {
+      id = nextMoodSongId;
+      mood;
+      title;
+      artist;
+      videoId;
+      addedBy = caller;
+      timestamp = Time.now();
+    };
+
+    moodSongs.add(nextMoodSongId, song);
+    let id = nextMoodSongId;
+    nextMoodSongId += 1;
+    id;
+  };
+
+  public query func getMoodSongs(mood : Text) : async [MoodSong] {
+    moodSongs.values().toArray().filter(
+      func(s) { s.mood == mood }
+    );
+  };
+
+  public query func getPublicUsername(user : Principal) : async ?Text {
+    switch (profiles.get(user)) {
+      case (null) { null };
+      case (?profile) {
+        if (profile.username == "") { null } else { ?profile.username }
+      };
+    };
+  };
+
+  public shared ({ caller }) func deleteMoodSong(songId : Nat) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can delete songs");
+    };
+
+    switch (moodSongs.get(songId)) {
+      case (null) { Runtime.trap("Song not found") };
+      case (?song) {
+        if (song.addedBy != caller and not AccessControl.isAdmin(accessControlState, caller)) {
+          Runtime.trap("Unauthorized: Can only delete your own songs");
+        };
+        moodSongs.remove(songId);
       };
     };
   };
