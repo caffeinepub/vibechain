@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "@tanstack/react-router";
-import { Waves } from "lucide-react";
+import { Loader2, LogIn, Waves } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import VibeCard from "../components/VibeCard";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
@@ -11,7 +11,51 @@ const SKELETON_KEYS = ["sk-a", "sk-b", "sk-c", "sk-d"];
 
 export default function FeedPage() {
   const { data: vibes, isLoading, isError } = useAllVibes();
-  const { identity } = useInternetIdentity();
+  const { identity, login, isLoggingIn } = useInternetIdentity();
+
+  // Show login prompt for unauthenticated users
+  if (!identity) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-10 min-h-[60vh] flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="glass-card rounded-3xl p-12 text-center max-w-md w-full"
+          data-ocid="feed.login_prompt"
+        >
+          <div className="w-16 h-16 rounded-2xl aurora-bg flex items-center justify-center mx-auto mb-6 shadow-glow">
+            <Waves className="w-8 h-8 text-white" />
+          </div>
+          <h2 className="text-2xl font-display font-bold gradient-text mb-3">
+            Login to see vibes
+          </h2>
+          <p className="text-muted-foreground text-sm leading-relaxed mb-8">
+            Connect with Internet Identity to explore the vibe feed and share
+            your own moods and music.
+          </p>
+          <Button
+            onClick={login}
+            disabled={isLoggingIn}
+            className="aurora-bg text-white border-0 font-semibold px-8 py-5 text-base rounded-2xl shadow-glow hover:opacity-90 transition-opacity w-full"
+            data-ocid="feed.login_button"
+          >
+            {isLoggingIn ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Connecting...
+              </>
+            ) : (
+              <>
+                <LogIn className="w-4 h-4 mr-2" />
+                Login to Continue
+              </>
+            )}
+          </Button>
+        </motion.div>
+      </div>
+    );
+  }
 
   const sorted = vibes
     ? [...vibes].sort((a, b) => Number(b.timestamp - a.timestamp))
@@ -32,13 +76,9 @@ export default function FeedPage() {
             Real moods. Real music. Real people.
           </p>
         </div>
-        {identity && (
-          <Link to="/post" data-ocid="feed.primary_button">
-            <Button className="aurora-bg text-white border-0">
-              + Post Vibe
-            </Button>
-          </Link>
-        )}
+        <Link to="/post" data-ocid="feed.primary_button">
+          <Button className="aurora-bg text-white border-0">+ Post Vibe</Button>
+        </Link>
       </motion.div>
 
       {isLoading && (
@@ -83,13 +123,11 @@ export default function FeedPage() {
           <p className="text-sm text-muted-foreground/60 mt-1">
             Be the first to share a vibe.
           </p>
-          {identity && (
-            <Link to="/post" className="mt-6 inline-block">
-              <Button className="aurora-bg text-white border-0 mt-4">
-                Post First Vibe
-              </Button>
-            </Link>
-          )}
+          <Link to="/post" className="mt-6 inline-block">
+            <Button className="aurora-bg text-white border-0 mt-4">
+              Post First Vibe
+            </Button>
+          </Link>
         </motion.div>
       )}
 

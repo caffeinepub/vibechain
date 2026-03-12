@@ -12,6 +12,7 @@ import {
   Headphones,
   Loader2,
   LogOut,
+  Music,
   Music2,
   Plus,
   Shield,
@@ -41,6 +42,11 @@ export default function Header() {
     { to: "/feed", label: "Feed", icon: <Waves className="w-4 h-4" /> },
     { to: "/circles", label: "Circles", icon: <Music2 className="w-4 h-4" /> },
     { to: "/music", label: "Music", icon: <Headphones className="w-4 h-4" /> },
+    {
+      to: "/vibe-listen",
+      label: "Vibe Listen",
+      icon: <Music className="w-4 h-4" />,
+    },
   ];
 
   return (
@@ -158,13 +164,13 @@ export default function Header() {
       </div>
 
       {/* Mobile nav */}
-      <div className="md:hidden flex items-center gap-1 px-4 pb-2">
+      <div className="md:hidden flex items-center gap-1 px-4 pb-2 overflow-x-auto">
         {navLinks.map((link) => (
           <Link
             key={link.to}
             to={link.to}
             data-ocid="nav.link"
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all whitespace-nowrap ${
               currentPath === link.to
                 ? "bg-primary/10 text-primary"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"

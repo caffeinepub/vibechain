@@ -10,7 +10,7 @@ interface Mood {
   description: string;
   gradient: string;
   glow: string;
-  songs: { title: string; videoId: string }[];
+  songs: { title: string; videoId: string; lang?: string }[];
 }
 
 const MOODS: Mood[] = [
@@ -28,6 +28,10 @@ const MOODS: Mood[] = [
       { title: "The Fray – How to Save a Life", videoId: "xPb_7O1FrEY" },
       { title: "Coldplay – The Scientist", videoId: "RB-RcX5DS5A" },
       { title: "Sam Smith – Stay with Me", videoId: "pB-5XG-DbAA" },
+      { title: "Arijit Singh – Channa Mereya", videoId: "284Ov7ysmfA", lang: "हिंदी" },
+      { title: "Arijit Singh – Tum Hi Ho", videoId: "Umqb9KENgmk", lang: "हिंदी" },
+      { title: "KK – Yaad Aayega", videoId: "LBNfPZPWdQ4", lang: "हिंदी" },
+      { title: "Jubin Nautiyal – Bewafa Tera Masoom Chehra", videoId: "n7oEQMWi98c", lang: "हिंदी" },
     ],
   },
   {
@@ -44,6 +48,10 @@ const MOODS: Mood[] = [
       { title: "Katy Perry – Roar", videoId: "CevxZvSJLk8" },
       { title: "Taylor Swift – Shake It Off", videoId: "nfWlot6h_JM" },
       { title: "Lizzo – Good as Hell", videoId: "SmbmeOgWsqE" },
+      { title: "Badshah – Paagal", videoId: "lXFZfBpCMro", lang: "हिंदी" },
+      { title: "Neha Kakkar – Aankh Marey", videoId: "xJeRuGVl_C4", lang: "हिंदी" },
+      { title: "Guru Randhawa – Lahore", videoId: "YKMEiFlGFqM", lang: "हिंदी" },
+      { title: "Diljit Dosanjh – Do You Know", videoId: "7tVLcn4UgNE", lang: "हिंदी" },
     ],
   },
   {
@@ -60,6 +68,10 @@ const MOODS: Mood[] = [
       { title: "The Weeknd – Blinding Lights", videoId: "4NRXx6U8ABQ" },
       { title: "Dua Lipa – Levitating", videoId: "TUVcZfQe-Kw" },
       { title: "Drake – Started From the Bottom", videoId: "RubBzkZzpUA" },
+      { title: "Honey Singh – Brown Rang", videoId: "SFmHGi0so58", lang: "हिंदी" },
+      { title: "Badshah – DJ Waley Babu", videoId: "yIIGQB6EMAM", lang: "हिंदी" },
+      { title: "Divine – Mere Gully Mein", videoId: "lMUzSAzDSNk", lang: "हिंदी" },
+      { title: "Raftaar – Swag Mera Desi", videoId: "OW_2ZDmW4YQ", lang: "हिंदी" },
     ],
   },
   {
@@ -76,6 +88,10 @@ const MOODS: Mood[] = [
       { title: "Mac Miller – Circles", videoId: "vU4ITButHiw" },
       { title: "Daniel Caesar – Best Part", videoId: "yKPNSHFNI_g" },
       { title: "SZA – Good Days", videoId: "QNvnHBDuQKI" },
+      { title: "Prateek Kuhad – cold/mess", videoId: "_SHNgl2Giek", lang: "हिंदी" },
+      { title: "Arijit Singh – Agar Tum Saath Ho", videoId: "sVODFGR0yes", lang: "हिंदी" },
+      { title: "Nucleya – Bass Rani", videoId: "3-BoxIBt_kY", lang: "हिंदी" },
+      { title: "When Chai Met Toast – Khoj", videoId: "Y_e0A_qFATo", lang: "हिंदी" },
     ],
   },
   {
@@ -92,6 +108,10 @@ const MOODS: Mood[] = [
       { title: "Beyoncé – Crazy in Love", videoId: "ViwtNLUqkMY" },
       { title: "Adele – Make You Feel My Love", videoId: "x21OU6pFABs" },
       { title: "Taylor Swift – Lover", videoId: "AqAJLh9wuZ0" },
+      { title: "Arijit Singh – Ae Dil Hai Mushkil", videoId: "6FURuLYrR_Q", lang: "हिंदी" },
+      { title: "Atif Aslam – Pehli Nazar Mein", videoId: "lDQ8FVq7tOM", lang: "हिंदी" },
+      { title: "Shreya Ghoshal – Sun Raha Hai Na Tu", videoId: "8tMSKqMt9GU", lang: "हिंदी" },
+      { title: "Mohit Chauhan – Tum Se Hi", videoId: "z5bGmKM5hLo", lang: "हिंदी" },
     ],
   },
   {
@@ -108,6 +128,10 @@ const MOODS: Mood[] = [
       { title: "Billie Eilish – bury a friend", videoId: "ZQMNBF4RRxo" },
       { title: "System of a Down – Chop Suey!", videoId: "CSvFpBOe8eY" },
       { title: "NIN – Closer", videoId: "5g5UNgSL0pA" },
+      { title: "Raftaar – Bandook", videoId: "mwFe0JXfOBg", lang: "हिंदी" },
+      { title: "Divine – Gunehgar", videoId: "jKv8guJVvJw", lang: "हिंदी" },
+      { title: "Yo Yo Honey Singh – Dope Shope", videoId: "nL4NWsNXFLY", lang: "हिंदी" },
+      { title: "Emiway Bantai – Machayenge", videoId: "L3v1GexZLXI", lang: "हिंदी" },
     ],
   },
   {
@@ -124,6 +148,10 @@ const MOODS: Mood[] = [
       { title: "Smashing Pumpkins – 1979", videoId: "4aeETEoNfOg" },
       { title: "Radiohead – Creep", videoId: "XFkzRNyygfk" },
       { title: "REM – Losing My Religion", videoId: "xwtdhWltSIg" },
+      { title: "Udit Narayan – Pehla Nasha", videoId: "b2OcKQ39cnw", lang: "हिंदी" },
+      { title: "Kumar Sanu – Ek Ladki Ko Dekha", videoId: "wYUXWMxKyAk", lang: "हिंदी" },
+      { title: "A.R. Rahman – Kehna Hi Kya", videoId: "5R0h9rBFgkE", lang: "हिंदी" },
+      { title: "KK – Yaaron", videoId: "s_vJlWCOFhg", lang: "हिंदी" },
     ],
   },
   {
@@ -140,6 +168,10 @@ const MOODS: Mood[] = [
       { title: "Daft Punk – Instant Crush", videoId: "a5uQMwRMHcs" },
       { title: "Interstellar Soundtrack – Main Theme", videoId: "UDVtMYqUAyw" },
       { title: "Max Richter – On the Nature of Daylight", videoId: "b_YHF4PqDkk" },
+      { title: "A.R. Rahman – Roja Theme", videoId: "S_kfGWHC37Q", lang: "हिंदी" },
+      { title: "Shankar-Ehsaan-Loy – Dil Chahta Hai Title", videoId: "2fNMSRsJOeE", lang: "हिंदी" },
+      { title: "Pritam – Jai Ho Title Track", videoId: "5oXWXs04eNA", lang: "हिंदी" },
+      { title: "A.R. Rahman – Maa Tujhe Salaam", videoId: "XoNiUW8MVGM", lang: "हिंदी" },
     ],
   },
 ];
@@ -199,17 +231,22 @@ export default function VibeListenPage() {
                 </div>
               ) : (
                 <button
-                  className={`w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 transition-colors`}
+                  className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 transition-colors"
                   onClick={() => setPlayingId(song.videoId)}
                   data-ocid={`vibe_listen.play_button.${i + 1}`}
                 >
                   <div className="w-10 h-10 rounded-full aurora-bg flex items-center justify-center shrink-0">
                     <Music2 className="w-4 h-4 text-white" />
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{song.title}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{song.title}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">Tap to play</p>
                   </div>
+                  {song.lang && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/30 shrink-0">
+                      {song.lang}
+                    </span>
+                  )}
                 </button>
               )}
             </motion.div>
@@ -228,6 +265,7 @@ export default function VibeListenPage() {
       >
         <h1 className="text-4xl font-display font-bold gradient-text mb-3">How are you feeling?</h1>
         <p className="text-muted-foreground">Pick your vibe and we'll play you the perfect songs.</p>
+        <p className="text-xs text-muted-foreground/60 mt-1">English + हिंदी songs for every mood</p>
       </motion.div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

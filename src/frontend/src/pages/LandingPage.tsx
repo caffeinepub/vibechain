@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Link } from "@tanstack/react-router";
 import { Heart, Loader2, Music2, Sparkles, Users, Waves } from "lucide-react";
 import { motion } from "motion/react";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
@@ -191,15 +190,15 @@ export default function LandingPage() {
                   <>Join the Vibe ✦</>
                 )}
               </Button>
-              <Link to="/feed">
-                <Button
-                  variant="ghost"
-                  className="text-muted-foreground hover:text-foreground px-8 py-6 text-lg rounded-2xl border border-border/50 hover:border-border"
-                  data-ocid="landing.secondary_button"
-                >
-                  Explore Vibes →
-                </Button>
-              </Link>
+              <Button
+                onClick={login}
+                disabled={isLoggingIn}
+                variant="ghost"
+                className="text-muted-foreground hover:text-foreground px-8 py-6 text-lg rounded-2xl border border-border/50 hover:border-border"
+                data-ocid="landing.secondary_button"
+              >
+                Explore Vibes →
+              </Button>
             </div>
           </motion.div>
         </div>
