@@ -1,6 +1,10 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+const MODEL_URL = "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights";
+const FACE_API_CDN =
+  "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js";
+
 type DetectorState =
   | "loading"
   | "streaming"
@@ -14,6 +18,42 @@ interface Props {
   onClose: () => void;
 }
 
+interface FaceExpressions {
+  neutral: number;
+  happy: number;
+  sad: number;
+  angry: number;
+  fearful: number;
+  disgusted: number;
+  surprised: number;
+  [key: string]: number;
+}
+
+interface FaceApiLib {
+  nets: {
+    tinyFaceDetector: { loadFromUri: (uri: string) => Promise<void> };
+    faceExpressionNet: { loadFromUri: (uri: string) => Promise<void> };
+  };
+  TinyFaceDetectorOptions: new (opts?: {
+    inputSize?: number;
+    scoreThreshold?: number;
+  }) => unknown;
+  detectSingleFace: (
+    input: HTMLVideoElement,
+    options: unknown,
+  ) => {
+    withFaceExpressions: () => Promise<
+      { expressions: FaceExpressions } | undefined
+    >;
+  };
+}
+
+declare global {
+  interface Window {
+    faceapi?: FaceApiLib;
+  }
+}
+
 const MOOD_LABELS: Record<
   string,
   { label: string; emoji: string; color: string }
@@ -24,55 +64,70 @@ const MOOD_LABELS: Record<
   energetic: { label: "Energetic", emoji: "⚡", color: "oklch(0.75 0.28 22)" },
   chill: { label: "Chill", emoji: "🌊", color: "oklch(0.72 0.18 202)" },
   romantic: { label: "Romantic", emoji: "💕", color: "oklch(0.80 0.22 345)" },
-  nostalgic: { label: "Nostalgic", emoji: "🌅", color: "oklch(0.78 0.22 292)" },
+  nostalgic: {
+    label: "Nostalgic",
+    emoji: "🌅",
+    color: "oklch(0.78 0.22 292)",
+  },
   focused: { label: "Focused", emoji: "🎯", color: "oklch(0.80 0.20 200)" },
 };
 
-/**
- * Analyse a video frame via canvas and infer a mood from colour/brightness.
- * Returns a mood key.
- */
-function analyseFrame(video: HTMLVideoElement): string {
-  const canvas = document.createElement("canvas");
-  canvas.width = 80;
-  canvas.height = 60;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return "chill";
+function expressionToMood(expressions: FaceExpressions): {
+  mood: string;
+  confidence: number;
+} {
+  const entries = [
+    { key: "happy", mood: "happy" },
+    { key: "sad", mood: "sad" },
+    { key: "angry", mood: "angry" },
+    { key: "surprised", mood: "energetic" },
+    { key: "fearful", mood: "nostalgic" },
+    { key: "disgusted", mood: "angry" },
+    { key: "neutral", mood: "chill" },
+  ] as const;
 
-  ctx.drawImage(video, 0, 0, 80, 60);
-  const data = ctx.getImageData(0, 0, 80, 60).data;
+  let topExpression = "neutral";
+  let topScore = 0;
 
-  let r = 0;
-  let g = 0;
-  let b = 0;
-  let count = 0;
-  for (let i = 0; i < data.length; i += 4) {
-    r += data[i];
-    g += data[i + 1];
-    b += data[i + 2];
-    count++;
+  for (const { key } of entries) {
+    const score = expressions[key] as number;
+    if (score > topScore) {
+      topScore = score;
+      topExpression = key;
+    }
   }
-  r /= count;
-  g /= count;
-  b /= count;
 
-  const brightness = (r + g + b) / 3;
-  const warmth = r - b; // positive = warm/red, negative = cool/blue
-  const greenDom = g - Math.max(r, b); // positive = green dominant
+  const mapped = entries.find((e) => e.key === topExpression);
+  return {
+    mood: mapped ? mapped.mood : "chill",
+    confidence: Math.round(topScore * 100),
+  };
+}
 
-  // Heuristic mood mapping
-  if (brightness > 160 && warmth > 20) return "happy";
-  if (brightness > 150 && warmth > 10) return "energetic";
-  if (brightness > 140 && greenDom > 10) return "focused";
-  if (brightness > 130) return "chill";
-  if (warmth > 30 && brightness < 130) return "angry";
-  if (warmth > 10 && brightness < 120) return "romantic";
-  if (b > r && b > g && brightness < 120) return "sad";
-  if (brightness < 100) return "nostalgic";
+let modelsLoaded = false;
+let scriptLoading: Promise<void> | null = null;
 
-  // Fallback: weighted random from all moods
-  const moods = Object.keys(MOOD_LABELS);
-  return moods[Math.floor(Math.random() * moods.length)];
+function loadFaceApiScript(): Promise<void> {
+  if (window.faceapi) return Promise.resolve();
+  if (scriptLoading) return scriptLoading;
+  scriptLoading = new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${FACE_API_CDN}"]`);
+    if (existing) {
+      const check = setInterval(() => {
+        if (window.faceapi) {
+          clearInterval(check);
+          resolve();
+        }
+      }, 50);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = FACE_API_CDN;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load face-api.js"));
+    document.head.appendChild(script);
+  });
+  return scriptLoading;
 }
 
 export default function FaceEmotionDetector({
@@ -82,9 +137,10 @@ export default function FaceEmotionDetector({
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [detectorState, setDetectorState] = useState<DetectorState>("loading");
-  const [countdown, setCountdown] = useState(3);
   const [resultMood, setResultMood] = useState<string | null>(null);
+  const [confidence, setConfidence] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
+  const [loadingMsg, setLoadingMsg] = useState("Loading AI models...");
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -98,13 +154,38 @@ export default function FaceEmotionDetector({
     onClose();
   }, [stopCamera, onClose]);
 
-  // Start camera
   useEffect(() => {
     let cancelled = false;
+
     async function init() {
+      if (!modelsLoaded) {
+        try {
+          setLoadingMsg("Loading AI models...");
+          await loadFaceApiScript();
+          const faceapi = window.faceapi;
+          if (!faceapi) throw new Error("face-api.js not available");
+          await Promise.all([
+            faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+            faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
+          ]);
+          modelsLoaded = true;
+        } catch {
+          if (!cancelled) {
+            setErrorMsg(
+              "Failed to load face detection models. Check your connection.",
+            );
+            setDetectorState("error");
+          }
+          return;
+        }
+      }
+
+      if (cancelled) return;
+
+      setLoadingMsg("Starting camera...");
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
+          video: { facingMode: "user" },
         });
         if (cancelled) {
           for (const t of stream.getTracks()) t.stop();
@@ -128,6 +209,7 @@ export default function FaceEmotionDetector({
         }
       }
     }
+
     init();
     return () => {
       cancelled = true;
@@ -135,46 +217,57 @@ export default function FaceEmotionDetector({
     };
   }, [stopCamera]);
 
-  // Countdown
-  useEffect(() => {
-    if (detectorState !== "streaming") return;
-    setCountdown(3);
-    const iv = setInterval(() => {
-      setCountdown((c) => {
-        if (c <= 1) {
-          clearInterval(iv);
-          return 0;
-        }
-        return c - 1;
-      });
-    }, 1000);
-    return () => clearInterval(iv);
-  }, [detectorState]);
+  const runScan = useCallback(async () => {
+    if (!videoRef.current || videoRef.current.readyState < 2) {
+      setDetectorState("no-face");
+      return;
+    }
 
-  // Scan when countdown hits 0
-  useEffect(() => {
-    if (countdown !== 0 || detectorState !== "streaming") return;
     setDetectorState("scanning");
+    const faceapi = window.faceapi;
+    if (!faceapi) {
+      setDetectorState("no-face");
+      return;
+    }
 
-    const timer = setTimeout(() => {
-      if (!videoRef.current || videoRef.current.readyState < 2) {
+    try {
+      const detection = await faceapi
+        .detectSingleFace(
+          videoRef.current,
+          new faceapi.TinyFaceDetectorOptions(),
+        )
+        .withFaceExpressions();
+
+      if (!detection) {
         setDetectorState("no-face");
         return;
       }
-      const mood = analyseFrame(videoRef.current);
+
+      const { mood, confidence: conf } = expressionToMood(
+        detection.expressions,
+      );
       setResultMood(mood);
+      setConfidence(conf);
       setDetectorState("result");
-      setTimeout(() => {
-        stopCamera();
-        onMoodDetected(mood);
-        onClose();
-      }, 2000);
-    }, 1200); // brief scanning animation
+    } catch {
+      setDetectorState("no-face");
+    }
+  }, []);
 
-    return () => clearTimeout(timer);
-  }, [countdown, detectorState, stopCamera, onMoodDetected, onClose]);
+  const applyMood = useCallback(() => {
+    if (resultMood) {
+      stopCamera();
+      onMoodDetected(resultMood);
+      onClose();
+    }
+  }, [resultMood, stopCamera, onMoodDetected, onClose]);
 
-  const retryScanning = () => setDetectorState("streaming");
+  const retryScanning = () => {
+    setResultMood(null);
+    setConfidence(0);
+    setDetectorState("streaming");
+  };
+
   const moodInfo = resultMood ? MOOD_LABELS[resultMood] : null;
 
   return (
@@ -216,7 +309,6 @@ export default function FaceEmotionDetector({
               border: "1px solid oklch(0.62 0.26 296 / 0.3)",
             }}
           >
-            {/* BG glow */}
             <div
               className="absolute inset-0 pointer-events-none opacity-20"
               style={{
@@ -225,7 +317,6 @@ export default function FaceEmotionDetector({
               }}
             />
 
-            {/* Close */}
             <button
               type="button"
               onClick={handleClose}
@@ -240,7 +331,6 @@ export default function FaceEmotionDetector({
               ✕
             </button>
 
-            {/* Title */}
             <div className="text-center mb-5 relative z-10">
               <motion.div
                 animate={{ rotate: [0, 10, -10, 0] }}
@@ -269,10 +359,8 @@ export default function FaceEmotionDetector({
               </p>
             </div>
 
-            {/* Video */}
             <div className="relative flex justify-center mb-5">
               <div className="relative">
-                {/* Pulsing rings */}
                 {(detectorState === "streaming" ||
                   detectorState === "scanning") && (
                   <>
@@ -312,7 +400,6 @@ export default function FaceEmotionDetector({
                   </>
                 )}
 
-                {/* Laser scan line */}
                 {detectorState === "scanning" && (
                   <motion.div
                     animate={{ top: ["0%", "100%", "0%"] }}
@@ -347,7 +434,6 @@ export default function FaceEmotionDetector({
                   }}
                 />
 
-                {/* Result overlay */}
                 {detectorState === "result" && moodInfo && (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.8 }}
@@ -373,8 +459,7 @@ export default function FaceEmotionDetector({
               </div>
             </div>
 
-            {/* Status area */}
-            <div className="text-center relative z-10 min-h-[56px] flex flex-col items-center justify-center gap-2">
+            <div className="text-center relative z-10 min-h-[80px] flex flex-col items-center justify-center gap-3">
               {detectorState === "loading" && (
                 <motion.div
                   animate={{ opacity: [0.5, 1, 0.5] }}
@@ -383,6 +468,7 @@ export default function FaceEmotionDetector({
                     repeat: Number.POSITIVE_INFINITY,
                   }}
                   className="flex flex-col items-center gap-2"
+                  data-ocid="face-detector.loading_state"
                 >
                   <div
                     className="w-8 h-8 rounded-full border-2 animate-spin"
@@ -395,29 +481,39 @@ export default function FaceEmotionDetector({
                     className="text-sm"
                     style={{ color: "oklch(0.62 0.26 296)" }}
                   >
-                    Starting camera...
+                    {loadingMsg}
                   </p>
                 </motion.div>
               )}
 
-              {detectorState === "streaming" && countdown > 0 && (
-                <>
-                  <motion.div
-                    key={countdown}
-                    initial={{ scale: 1.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    className="text-4xl font-black"
-                    style={{ color: "oklch(0.82 0.26 296)" }}
-                  >
-                    {countdown}
-                  </motion.div>
+              {detectorState === "streaming" && (
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex flex-col items-center gap-3"
+                >
                   <p
                     className="text-xs"
                     style={{ color: "oklch(0.55 0.08 265)" }}
                   >
-                    Hold still, scanning in {countdown}...
+                    Position your face in the frame
                   </p>
-                </>
+                  <button
+                    type="button"
+                    onClick={runScan}
+                    data-ocid="face-detector.scan_button"
+                    className="px-6 py-2 rounded-xl text-sm font-bold transition-all hover:scale-105 active:scale-95"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, oklch(0.62 0.26 296 / 0.85), oklch(0.72 0.28 340 / 0.85))",
+                      border: "1px solid oklch(0.72 0.28 296 / 0.5)",
+                      color: "oklch(0.98 0.01 265)",
+                      boxShadow: "0 0 20px oklch(0.62 0.26 296 / 0.3)",
+                    }}
+                  >
+                    ✨ Scan My Vibe
+                  </button>
+                </motion.div>
               )}
 
               {detectorState === "scanning" && (
@@ -438,20 +534,69 @@ export default function FaceEmotionDetector({
                 <motion.div
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="text-center"
+                  className="flex flex-col items-center gap-2 w-full"
                 >
                   <p
                     className="text-sm font-bold"
                     style={{ color: moodInfo.color }}
                   >
-                    We detected: {moodInfo.emoji} {moodInfo.label}!
+                    {moodInfo.emoji} {moodInfo.label} detected!
                   </p>
-                  <p
-                    className="text-xs mt-1"
-                    style={{ color: "oklch(0.55 0.08 265)" }}
-                  >
-                    Setting your vibe...
-                  </p>
+                  <div className="w-full max-w-[200px]">
+                    <div
+                      className="flex justify-between text-xs mb-1"
+                      style={{ color: "oklch(0.55 0.08 265)" }}
+                    >
+                      <span>Confidence</span>
+                      <span style={{ color: moodInfo.color }}>
+                        {confidence}%
+                      </span>
+                    </div>
+                    <div
+                      className="w-full h-1.5 rounded-full overflow-hidden"
+                      style={{ background: "oklch(0.22 0.06 265 / 0.6)" }}
+                    >
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${confidence}%` }}
+                        transition={{ duration: 0.6, ease: "easeOut" }}
+                        className="h-full rounded-full"
+                        style={{
+                          background: `linear-gradient(90deg, ${moodInfo.color}, oklch(0.82 0.22 340))`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-1">
+                    <button
+                      type="button"
+                      onClick={applyMood}
+                      data-ocid="face-detector.apply_button"
+                      className="px-4 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, oklch(0.62 0.26 296 / 0.85), oklch(0.72 0.28 340 / 0.85))",
+                        border: "1px solid oklch(0.72 0.28 296 / 0.5)",
+                        color: "oklch(0.98 0.01 265)",
+                        boxShadow: "0 0 16px oklch(0.62 0.26 296 / 0.3)",
+                      }}
+                    >
+                      Apply this Vibe
+                    </button>
+                    <button
+                      type="button"
+                      onClick={retryScanning}
+                      data-ocid="face-detector.secondary_button"
+                      className="px-4 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105"
+                      style={{
+                        background: "oklch(0.22 0.06 265 / 0.6)",
+                        border: "1px solid oklch(0.35 0.08 265 / 0.5)",
+                        color: "oklch(0.65 0.08 265)",
+                      }}
+                    >
+                      Scan Again
+                    </button>
+                  </div>
                 </motion.div>
               )}
 
@@ -460,12 +605,13 @@ export default function FaceEmotionDetector({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   className="flex flex-col items-center gap-2"
+                  data-ocid="face-detector.error_state"
                 >
                   <p
                     className="text-sm"
                     style={{ color: "oklch(0.75 0.20 40)" }}
                   >
-                    Could not read your vibe — try again
+                    No face detected, try again
                   </p>
                   <button
                     type="button"
@@ -488,6 +634,7 @@ export default function FaceEmotionDetector({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   className="flex flex-col items-center gap-3"
+                  data-ocid="face-detector.error_state"
                 >
                   <p
                     className="text-xs text-center"

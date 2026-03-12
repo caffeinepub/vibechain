@@ -95,7 +95,7 @@ export default function PostVibePage() {
         message: encodedMessage || null,
       });
       toast.success("Vibe posted! ✨");
-      navigate({ to: "/feed" });
+      navigate({ to: "/vibe-listen" });
     } catch {
       toast.error("Couldn't post your vibe. Try again.");
     }
@@ -212,10 +212,8 @@ export default function PostVibePage() {
             </div>
           </div>
 
-          {/* Music Link Card */}
           <div className="glass-card rounded-2xl p-6 space-y-4">
             <div className="flex items-center gap-3">
-              {/* YouTube logo */}
               <svg
                 viewBox="0 0 24 24"
                 className="w-5 h-5"
@@ -249,7 +247,6 @@ export default function PostVibePage() {
               )}
             </div>
 
-            {/* YouTube Preview */}
             {previewMusic?.kind === "youtube" && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.97 }}

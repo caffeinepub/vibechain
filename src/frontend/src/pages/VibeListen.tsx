@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Camera,
   ChevronDown,
@@ -10,13 +11,22 @@ import {
   Music,
   Music2,
   Plus,
+  Search,
   Shuffle,
   Trash2,
   UserPlus,
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { Suspense, lazy, useEffect, useState } from "react";
+import type React from "react";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type {
   backendInterface as FullBackendInterface,
   MoodSong,
@@ -541,6 +551,381 @@ const EMPTY_FORM: AddSongFormState = {
   error: "",
 };
 
+// ── iTunes Search ──────────────────────────────────────────────────────────
+interface ItunesTrack {
+  trackName: string;
+  artistName: string;
+  collectionName: string;
+  artworkUrl100: string;
+  trackId: number;
+}
+
+interface AddSongTabsProps {
+  currentMood: MoodConfig;
+  addForm: AddSongFormState;
+  setAddForm: React.Dispatch<React.SetStateAction<AddSongFormState>>;
+  isSubmittingSong: boolean;
+  actor: unknown;
+  actorFetching: boolean;
+  handleAddSong: () => void;
+}
+
+function AddSongTabs({
+  currentMood,
+  addForm,
+  setAddForm,
+  isSubmittingSong,
+  actor,
+  actorFetching,
+  handleAddSong,
+}: AddSongTabsProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<ItunesTrack[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const [ytSearchLoading, setYtSearchLoading] = useState(false);
+  const [ytSearchFailed, setYtSearchFailed] = useState(false);
+  const [importedTrack, setImportedTrack] = useState<ItunesTrack | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchItunes = useCallback(async (q: string) => {
+    if (!q.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    setSearchLoading(true);
+    setSearchError("");
+    try {
+      const res = await fetch(
+        `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=10`,
+      );
+      if (!res.ok) throw new Error("Network error");
+      const data = await res.json();
+      setSearchResults(data.results ?? []);
+    } catch {
+      setSearchError("Failed to search. Check your connection and try again.");
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, []);
+
+  const INVIDIOUS_INSTANCES = [
+    "https://inv.nadeko.net",
+    "https://invidious.privacyredirect.com",
+    "https://invidious.nerdvpn.de",
+    "https://invidious.io.lol",
+    "https://invidious.fdn.fr",
+    "https://vid.puffyan.us",
+  ];
+
+  const searchYouTube = async (
+    title: string,
+    artist: string,
+  ): Promise<string | null> => {
+    const q = encodeURIComponent(`${title} ${artist} official audio`);
+    for (const base of INVIDIOUS_INSTANCES) {
+      try {
+        const res = await fetch(`${base}/api/v1/search?q=${q}&type=video`, {
+          signal: AbortSignal.timeout(6000),
+        });
+        if (!res.ok) continue;
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0 && data[0].videoId) {
+          return `https://www.youtube.com/watch?v=${data[0].videoId}`;
+        }
+      } catch {
+        // try next instance
+      }
+    }
+    return null;
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setSearchQuery(val);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchItunes(val), 300);
+  };
+
+  const handleImport = async (track: ItunesTrack) => {
+    setImportedTrack(track);
+    setAddForm((f) => ({
+      ...f,
+      title: track.trackName,
+      artist: track.artistName,
+      url: "",
+      error: "",
+    }));
+    setYtSearchFailed(false);
+    setYtSearchLoading(true);
+    const youtubeUrl = await searchYouTube(track.trackName, track.artistName);
+    setYtSearchLoading(false);
+    if (youtubeUrl) {
+      setAddForm((f) => ({ ...f, url: youtubeUrl, error: "" }));
+    } else {
+      setYtSearchFailed(true);
+    }
+  };
+
+  const handleClearImport = () => {
+    setImportedTrack(null);
+    setYtSearchFailed(false);
+    setYtSearchLoading(false);
+    setAddForm((f) => ({ ...f, title: "", artist: "", url: "", error: "" }));
+  };
+
+  const borderSoft = currentMood.borderColor.replace("0.5)", "0.35)");
+
+  // If a song has been selected for import, show confirmation card
+  if (importedTrack) {
+    return (
+      <div className="space-y-4">
+        {/* Imported song card */}
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border"
+          style={{ borderColor: currentMood.borderColor }}
+        >
+          <img
+            src={importedTrack.artworkUrl100}
+            alt={importedTrack.collectionName}
+            className="w-14 h-14 rounded-lg object-cover shrink-0"
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold truncate text-foreground leading-tight">
+              {importedTrack.trackName}
+            </p>
+            <p className="text-xs text-muted-foreground truncate leading-tight">
+              {importedTrack.artistName}
+            </p>
+            <p className="text-[11px] text-muted-foreground/60 truncate leading-tight mt-0.5">
+              {importedTrack.collectionName}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleClearImport}
+            className="text-muted-foreground/60 hover:text-foreground transition-colors shrink-0 p-1"
+            aria-label="Cancel import"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </motion.div>
+
+        {/* YouTube search status */}
+        <AnimatePresence>
+          {ytSearchLoading && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-white/5 border border-white/10"
+              style={{ color: currentMood.textColor }}
+            >
+              <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin shrink-0" />
+              Finding YouTube link automatically...
+            </motion.div>
+          )}
+          {!ytSearchLoading && ytSearchFailed && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col gap-2"
+            >
+              <p className="text-xs text-destructive px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/20">
+                Couldn&apos;t find a link automatically. Paste a YouTube URL
+                below:
+              </p>
+              <Input
+                data-ocid="vibe-listen.add_song.youtube_input"
+                placeholder="https://youtube.com/watch?v=..."
+                value={addForm.url}
+                onChange={(e) =>
+                  setAddForm((f) => ({ ...f, url: e.target.value }))
+                }
+                className="rounded-xl bg-white/5 border-white/20 text-sm"
+              />
+            </motion.div>
+          )}
+          {!ytSearchLoading && !ytSearchFailed && addForm.url && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-white/5 border border-white/10"
+              style={{ color: currentMood.textColor }}
+            >
+              <span>✅ YouTube link found</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Error */}
+        <AnimatePresence>
+          {addForm.error && (
+            <motion.p
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              data-ocid="vibe-listen.add_song.error_state"
+              className="text-xs text-destructive font-medium"
+            >
+              {addForm.error}
+            </motion.p>
+          )}
+        </AnimatePresence>
+
+        {/* Add button */}
+        <Button
+          type="button"
+          size="sm"
+          onClick={handleAddSong}
+          disabled={
+            isSubmittingSong ||
+            ytSearchLoading ||
+            (ytSearchFailed && !addForm.url) ||
+            (!actor && actorFetching)
+          }
+          data-ocid="vibe-listen.add_song.submit_button"
+          className="w-full rounded-xl font-semibold gap-2"
+          style={{
+            background: currentMood.bgColor,
+            color: currentMood.textColor,
+            border: `1px solid ${currentMood.borderColor}`,
+            boxShadow: `0 0 16px ${currentMood.glowColor.replace("0.5)", "0.2)")}`,
+          }}
+        >
+          <Plus className="w-4 h-4" />
+          {isSubmittingSong
+            ? "Adding..."
+            : !actor && actorFetching
+              ? "Connecting..."
+              : ytSearchLoading
+                ? "Searching..."
+                : "Add to Vibe"}
+        </Button>
+
+        <button
+          type="button"
+          onClick={handleClearImport}
+          className="w-full text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors py-1"
+        >
+          ← Back to search
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <Input
+        placeholder="Search by song or artist..."
+        value={searchQuery}
+        onChange={handleSearchChange}
+        data-ocid="music.search_input"
+        className="bg-transparent border-border/50 focus:border-current rounded-lg text-sm"
+        style={{ borderColor: borderSoft }}
+      />
+
+      {searchLoading && (
+        <div
+          className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+          data-ocid="music.search.loading_state"
+        >
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10"
+            >
+              <Skeleton className="w-12 h-12 rounded-lg shrink-0" />
+              <div className="flex-1 space-y-1.5">
+                <Skeleton className="h-3 w-3/4 rounded" />
+                <Skeleton className="h-2.5 w-1/2 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {searchError && !searchLoading && (
+        <p
+          data-ocid="music.search.error_state"
+          className="text-xs text-destructive text-center py-4"
+        >
+          {searchError}
+        </p>
+      )}
+
+      {!searchLoading &&
+        !searchError &&
+        searchQuery &&
+        searchResults.length === 0 && (
+          <p
+            data-ocid="music.search.empty_state"
+            className="text-xs text-muted-foreground text-center py-4"
+          >
+            No songs found. Try a different search.
+          </p>
+        )}
+
+      {!searchLoading && !searchError && searchResults.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-0.5">
+          {searchResults.map((track, idx) => (
+            <motion.div
+              key={track.trackId}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.04 }}
+              data-ocid={`music.result.item.${idx + 1}`}
+              className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors group"
+            >
+              <img
+                src={track.artworkUrl100}
+                alt={track.collectionName}
+                className="w-12 h-12 rounded-lg object-cover shrink-0"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold truncate text-foreground leading-tight">
+                  {track.trackName}
+                </p>
+                <p className="text-xs text-muted-foreground truncate leading-tight">
+                  {track.artistName}
+                </p>
+                <p className="text-[10px] text-muted-foreground/60 truncate leading-tight">
+                  {track.collectionName}
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                data-ocid={`music.result.import_button.${idx + 1}`}
+                onClick={() => handleImport(track)}
+                className="shrink-0 h-7 px-2 text-xs rounded-lg font-semibold"
+                style={{
+                  background: currentMood.bgColor,
+                  color: currentMood.textColor,
+                  border: `1px solid ${currentMood.borderColor}`,
+                }}
+              >
+                Add
+              </Button>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      {!searchQuery && !searchLoading && (
+        <p className="text-xs text-muted-foreground/60 text-center py-4">
+          Type above to search the music library
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function VibeListen() {
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<FavSong[]>(loadFavorites);
@@ -552,6 +937,7 @@ export default function VibeListen() {
   // Per-mood add form open state
   const [addFormOpen, setAddFormOpen] = useState(false);
   const [addForm, setAddForm] = useState<AddSongFormState>(EMPTY_FORM);
+  const [isSubmittingSong, setIsSubmittingSong] = useState(false);
   const [addedByUsernames, setAddedByUsernames] = useState<
     Record<string, string>
   >({});
@@ -563,6 +949,8 @@ export default function VibeListen() {
   } = useMiniPlayer();
   const { actor: _actor, isFetching: actorFetching } = useActor();
   const actor = _actor as unknown as FullBackendInterface | null;
+  const actorRef = useRef<FullBackendInterface | null>(null);
+  actorRef.current = actor;
   const { identity } = useInternetIdentity();
 
   useEffect(() => {
@@ -694,22 +1082,33 @@ export default function VibeListen() {
       setAddForm((f) => ({ ...f, error: "Please log in to add songs." }));
       return;
     }
-    if (!actor || actorFetching) {
-      setAddForm((f) => ({
-        ...f,
-        error: "Still connecting, please try again.",
-      }));
-      return;
-    }
     setAddForm((f) => ({ ...f, error: "" }));
+    setIsSubmittingSong(true);
     try {
-      await actor.addMoodSong(
+      // Wait up to 8 seconds for actor to be ready
+      let resolvedActor = actorRef.current;
+      if (!resolvedActor) {
+        for (let i = 0; i < 16; i++) {
+          await new Promise((r) => setTimeout(r, 500));
+          resolvedActor = actorRef.current;
+          if (resolvedActor) break;
+        }
+      }
+      if (!resolvedActor) {
+        setAddForm((f) => ({
+          ...f,
+          error: "Could not connect. Please wait a moment and try again.",
+        }));
+        setIsSubmittingSong(false);
+        return;
+      }
+      await resolvedActor.addMoodSong(
         selectedMood,
         title.trim(),
         artist.trim(),
         videoId,
       );
-      const songs = await actor.getMoodSongs(selectedMood);
+      const songs = await resolvedActor.getMoodSongs(selectedMood);
       setBackendSongs(songs);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -722,8 +1121,10 @@ export default function VibeListen() {
             ? "This song is already in the list."
             : `Failed to add song: ${msg}`;
       setAddForm((f) => ({ ...f, error: friendly }));
+      setIsSubmittingSong(false);
       return;
     }
+    setIsSubmittingSong(false);
     setAddForm(EMPTY_FORM);
     setAddFormOpen(false);
   };
@@ -1514,128 +1915,15 @@ export default function VibeListen() {
                         </span>
                       </div>
 
-                      <div className="grid gap-3">
-                        <div>
-                          <label
-                            className="text-xs text-muted-foreground mb-1 block"
-                            htmlFor="add-song-title"
-                          >
-                            Song Title
-                          </label>
-                          <Input
-                            id="add-song-title"
-                            placeholder="e.g. Tum Hi Ho"
-                            value={addForm.title}
-                            onChange={(e) =>
-                              setAddForm((f) => ({
-                                ...f,
-                                title: e.target.value,
-                                error: "",
-                              }))
-                            }
-                            data-ocid="vibe-listen.add_song.title.input"
-                            className="bg-transparent border-border/50 focus:border-current rounded-lg text-sm"
-                            style={{
-                              borderColor: currentMood.borderColor.replace(
-                                "0.5)",
-                                "0.35)",
-                              ),
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <label
-                            className="text-xs text-muted-foreground mb-1 block"
-                            htmlFor="add-song-artist"
-                          >
-                            Artist
-                          </label>
-                          <Input
-                            id="add-song-artist"
-                            placeholder="e.g. Arijit Singh"
-                            value={addForm.artist}
-                            onChange={(e) =>
-                              setAddForm((f) => ({
-                                ...f,
-                                artist: e.target.value,
-                                error: "",
-                              }))
-                            }
-                            data-ocid="vibe-listen.add_song.artist.input"
-                            className="bg-transparent border-border/50 focus:border-current rounded-lg text-sm"
-                            style={{
-                              borderColor: currentMood.borderColor.replace(
-                                "0.5)",
-                                "0.35)",
-                              ),
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <label
-                            className="text-xs text-muted-foreground mb-1 block"
-                            htmlFor="add-song-url"
-                          >
-                            YouTube URL or Video ID
-                          </label>
-                          <Input
-                            id="add-song-url"
-                            placeholder="https://youtube.com/watch?v=... or video ID"
-                            value={addForm.url}
-                            onChange={(e) =>
-                              setAddForm((f) => ({
-                                ...f,
-                                url: e.target.value,
-                                error: "",
-                              }))
-                            }
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") handleAddSong();
-                            }}
-                            data-ocid="vibe-listen.add_song.url.input"
-                            className="bg-transparent border-border/50 focus:border-current rounded-lg text-sm font-mono"
-                            style={{
-                              borderColor: currentMood.borderColor.replace(
-                                "0.5)",
-                                "0.35)",
-                              ),
-                            }}
-                          />
-                        </div>
-
-                        {/* Inline error */}
-                        <AnimatePresence>
-                          {addForm.error && (
-                            <motion.p
-                              initial={{ opacity: 0, y: -4 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -4 }}
-                              transition={{ duration: 0.18 }}
-                              data-ocid="vibe-listen.add_song.error_state"
-                              className="text-xs text-destructive font-medium"
-                            >
-                              {addForm.error}
-                            </motion.p>
-                          )}
-                        </AnimatePresence>
-
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={handleAddSong}
-                          data-ocid="vibe-listen.add_song.submit_button"
-                          className="w-full rounded-xl font-semibold mt-1 gap-2"
-                          style={{
-                            background: currentMood.bgColor,
-                            color: currentMood.textColor,
-                            border: `1px solid ${currentMood.borderColor}`,
-                            boxShadow: `0 0 16px ${currentMood.glowColor.replace("0.5)", "0.2)")}`,
-                          }}
-                        >
-                          <Plus className="w-4 h-4" />
-                          Add Song
-                        </Button>
-                      </div>
+                      <AddSongTabs
+                        currentMood={currentMood}
+                        addForm={addForm}
+                        setAddForm={setAddForm}
+                        isSubmittingSong={isSubmittingSong}
+                        actor={actor}
+                        actorFetching={actorFetching}
+                        handleAddSong={handleAddSong}
+                      />
                     </div>
                   </motion.div>
                 )}

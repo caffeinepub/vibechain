@@ -255,7 +255,7 @@ export default function MiniPlayerBar() {
           exit={{ y: 80, opacity: 0 }}
           transition={{ type: "spring", stiffness: 320, damping: 30 }}
           data-ocid="mini-player.bar"
-          className="fixed bottom-0 left-0 right-0 z-50 glass-card relative"
+          className="fixed bottom-4 left-4 right-4 z-50 glass-card relative rounded-2xl overflow-hidden"
           style={{
             borderTop: `1px solid ${currentMoodConfig.borderColor}`,
             boxShadow: `0 -4px 32px ${currentMoodConfig.glowColor}, 0 -1px 0 ${currentMoodConfig.borderColor}`,
@@ -268,7 +268,7 @@ export default function MiniPlayerBar() {
             className="absolute top-0 left-0 right-0 overflow-hidden"
             style={{
               height: 6,
-              borderRadius: 0,
+              borderRadius: "8px 8px 0 0",
               zIndex: 10,
               cursor: duration > 0 ? "pointer" : "default",
             }}

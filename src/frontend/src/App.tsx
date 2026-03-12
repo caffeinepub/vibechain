@@ -14,13 +14,7 @@ import Footer from "./components/layout/Footer";
 import Header from "./components/layout/Header";
 import { MiniPlayerProvider, useMiniPlayer } from "./context/MiniPlayerContext";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
-import AdminPage from "./pages/AdminPage";
-import FeedPage from "./pages/FeedPage";
 import LandingPage from "./pages/LandingPage";
-import MusicPage from "./pages/MusicPage";
-import PostVibePage from "./pages/PostVibePage";
-import ProfilePage from "./pages/ProfilePage";
-import VibeCirclesPage from "./pages/VibeCirclesPage";
 import VibeListen from "./pages/VibeListen";
 
 function RootLayout() {
@@ -28,7 +22,7 @@ function RootLayout() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <main className={`flex-1${playingVideoId ? " pb-20" : ""}`}>
+      <main className={`flex-1${playingVideoId ? " pb-28" : ""}`}>
         <Outlet />
       </main>
       <Footer />
@@ -46,7 +40,6 @@ function RootLayout() {
   );
 }
 
-/** Wraps any page — redirects to the login prompt if not authenticated */
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { identity, login, isLoggingIn } = useInternetIdentity();
 
@@ -64,7 +57,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
               "0 0 60px oklch(0.62 0.26 296 / 0.15), 0 0 120px oklch(0.55 0.28 240 / 0.08)",
           }}
         >
-          {/* Icon */}
           <motion.div
             animate={{ rotate: [0, 10, -10, 0] }}
             transition={{
@@ -89,8 +81,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
             Login to Vibe
           </h2>
           <p className="text-sm text-muted-foreground mb-7 leading-relaxed">
-            This page is only visible after login. Join VIBECHAIN to access all
-            features.
+            Join VIBECHAIN to access Vibe Listen and discover mood-matched
+            music.
           </p>
 
           <button
@@ -119,7 +111,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function HomeRoute() {
   const { identity } = useInternetIdentity();
-  if (identity) return <FeedPage />;
+  if (identity) {
+    // Redirect to vibe-listen when logged in
+    return <VibeListen />;
+  }
   return <LandingPage />;
 }
 
@@ -131,72 +126,12 @@ const indexRoute = createRoute({
   component: HomeRoute,
 });
 
-const feedRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/feed",
-  component: () => (
-    <ProtectedRoute>
-      <FeedPage />
-    </ProtectedRoute>
-  ),
-});
-
-const postRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/post",
-  component: () => (
-    <ProtectedRoute>
-      <PostVibePage />
-    </ProtectedRoute>
-  ),
-});
-
-const circlesRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/circles",
-  component: () => (
-    <ProtectedRoute>
-      <VibeCirclesPage />
-    </ProtectedRoute>
-  ),
-});
-
-const profileRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/profile",
-  component: () => (
-    <ProtectedRoute>
-      <ProfilePage />
-    </ProtectedRoute>
-  ),
-});
-
-const musicRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/music",
-  component: () => (
-    <ProtectedRoute>
-      <MusicPage />
-    </ProtectedRoute>
-  ),
-});
-
 const vibeListenRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/vibe-listen",
   component: () => (
     <ProtectedRoute>
       <VibeListen />
-    </ProtectedRoute>
-  ),
-});
-
-const adminRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/admin",
-  component: () => (
-    <ProtectedRoute>
-      <AdminPage />
     </ProtectedRoute>
   ),
 });
@@ -217,13 +152,7 @@ const notFoundRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
-  feedRoute,
-  postRoute,
-  circlesRoute,
-  profileRoute,
-  musicRoute,
   vibeListenRoute,
-  adminRoute,
   notFoundRoute,
 ]);
 

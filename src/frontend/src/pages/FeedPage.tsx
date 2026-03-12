@@ -13,7 +13,6 @@ export default function FeedPage() {
   const { data: vibes, isLoading, isError } = useAllVibes();
   const { identity, login, isLoggingIn } = useInternetIdentity();
 
-  // Show login prompt for unauthenticated users
   if (!identity) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-10 min-h-[60vh] flex items-center justify-center">
@@ -31,8 +30,7 @@ export default function FeedPage() {
             Login to see vibes
           </h2>
           <p className="text-muted-foreground text-sm leading-relaxed mb-8">
-            Connect with Internet Identity to explore the vibe feed and share
-            your own moods and music.
+            Connect with Internet Identity to explore the vibe feed.
           </p>
           <Button
             onClick={login}
@@ -76,8 +74,8 @@ export default function FeedPage() {
             Real moods. Real music. Real people.
           </p>
         </div>
-        <Link to="/post" data-ocid="feed.primary_button">
-          <Button className="aurora-bg text-white border-0">+ Post Vibe</Button>
+        <Link to="/vibe-listen" data-ocid="feed.primary_button">
+          <Button className="aurora-bg text-white border-0">Vibe Listen</Button>
         </Link>
       </motion.div>
 
@@ -106,7 +104,7 @@ export default function FeedPage() {
         <div className="text-center py-16" data-ocid="feed.error_state">
           <p className="text-destructive text-4xl mb-3">✦</p>
           <p className="text-muted-foreground">
-            Couldn't load vibes. The cosmos is resting.
+            Couldn\'t load vibes. The cosmos is resting.
           </p>
         </div>
       )}
@@ -123,9 +121,9 @@ export default function FeedPage() {
           <p className="text-sm text-muted-foreground/60 mt-1">
             Be the first to share a vibe.
           </p>
-          <Link to="/post" className="mt-6 inline-block">
+          <Link to="/vibe-listen" className="mt-6 inline-block">
             <Button className="aurora-bg text-white border-0 mt-4">
-              Post First Vibe
+              Go to Vibe Listen
             </Button>
           </Link>
         </motion.div>

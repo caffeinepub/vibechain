@@ -8,8 +8,10 @@ import {
   createRouter,
   useNavigate,
 } from "@tanstack/react-router";
+import MiniPlayerBar from "./components/MiniPlayerBar";
 import Footer from "./components/layout/Footer";
 import Header from "./components/layout/Header";
+import { MiniPlayerProvider } from "./context/MiniPlayerContext";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
 import AdminPage from "./pages/AdminPage";
 import FeedPage from "./pages/FeedPage";
@@ -22,22 +24,25 @@ import VibeListenPage from "./pages/VibeListenPage";
 
 function RootLayout() {
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      <main className="flex-1">
-        <Outlet />
-      </main>
-      <Footer />
-      <Toaster
-        theme="dark"
-        toastOptions={{
-          classNames: {
-            toast: "glass-card border-border",
-            title: "text-foreground",
-          },
-        }}
-      />
-    </div>
+    <MiniPlayerProvider>
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <main className="flex-1">
+          <Outlet />
+        </main>
+        <Footer />
+        <MiniPlayerBar />
+        <Toaster
+          theme="dark"
+          toastOptions={{
+            classNames: {
+              toast: "glass-card border-border",
+              title: "text-foreground",
+            },
+          }}
+        />
+      </div>
+    </MiniPlayerProvider>
   );
 }
 

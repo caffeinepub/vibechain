@@ -120,7 +120,7 @@ export default function ProfilePage() {
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
                         className="font-semibold text-lg bg-muted/30 border-border/50 w-48"
-                        placeholder="Your display name / user ID"
+                        placeholder="Your display name"
                         data-ocid="profile.input"
                       />
                       <p className="text-xs text-muted-foreground mt-1">
@@ -224,12 +224,12 @@ export default function ProfilePage() {
           <div className="text-center py-16" data-ocid="profile.empty_state">
             <p className="text-4xl mb-3">🎵</p>
             <p className="text-muted-foreground">No vibes yet.</p>
-            <Link to="/post" className="mt-4 inline-block">
+            <Link to="/vibe-listen" className="mt-4 inline-block">
               <Button
                 className="aurora-bg text-white border-0 mt-3"
                 data-ocid="profile.secondary_button"
               >
-                Post Your First Vibe
+                Go to Vibe Listen
               </Button>
             </Link>
           </div>
