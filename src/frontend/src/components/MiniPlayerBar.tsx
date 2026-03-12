@@ -1,7 +1,45 @@
 import { Pause, Play, SkipBack, SkipForward, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMiniPlayer } from "../context/MiniPlayerContext";
+
+// Minimal YT IFrame API types
+declare global {
+  interface Window {
+    YT: {
+      Player: new (
+        elementId: string | HTMLElement,
+        options: {
+          videoId?: string;
+          playerVars?: Record<string, unknown>;
+          events?: {
+            onReady?: (e: { target: YTPlayer }) => void;
+            onStateChange?: (e: { data: number }) => void;
+          };
+        },
+      ) => YTPlayer;
+      PlayerState: { PLAYING: number; PAUSED: number; ENDED: number };
+    };
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+
+interface YTPlayer {
+  playVideo(): void;
+  pauseVideo(): void;
+  loadVideoById(id: string): void;
+  getCurrentTime(): number;
+  getDuration(): number;
+  getVideoLoadedFraction(): number;
+  destroy(): void;
+}
+
+function formatTime(secs: number): string {
+  if (!Number.isFinite(secs) || secs < 0) return "0:00";
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
 
 export default function MiniPlayerBar() {
   const {
@@ -17,18 +55,146 @@ export default function MiniPlayerBar() {
     hasPrev,
   } = useMiniPlayer();
 
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const playerContainerRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<YTPlayer | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [buffered, setBuffered] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const isPlayingRef = useRef(isPlaying);
+  isPlayingRef.current = isPlaying;
+  const playNextRef = useRef(playNext);
+  playNextRef.current = playNext;
+  const hasNextRef = useRef(hasNext);
+  hasNextRef.current = hasNext;
 
-  // Send play/pause commands to the YouTube iframe via postMessage
+  const stopPolling = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
+
+  const startPolling = useCallback(() => {
+    stopPolling();
+    intervalRef.current = setInterval(() => {
+      const p = playerRef.current;
+      if (!p) return;
+      try {
+        const cur = p.getCurrentTime();
+        const dur = p.getDuration();
+        const buf = p.getVideoLoadedFraction();
+        setCurrentTime(cur);
+        setDuration(dur);
+        setProgress(dur > 0 ? cur / dur : 0);
+        setBuffered(buf);
+      } catch (_) {
+        // ignore
+      }
+    }, 500);
+  }, [stopPolling]);
+
+  // Load YT API once
   useEffect(() => {
-    const iframe = iframeRef.current;
-    if (!iframe) return;
-    const func = isPlaying ? "playVideo" : "pauseVideo";
-    iframe.contentWindow?.postMessage(
-      JSON.stringify({ event: "command", func, args: [] }),
-      "*",
-    );
-  }, [isPlaying]);
+    if (window.YT) return;
+    if (document.getElementById("yt-iframe-api-script")) return;
+    const tag = document.createElement("script");
+    tag.id = "yt-iframe-api-script";
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(tag);
+  }, []);
+
+  // Create/recreate player when videoId changes
+  useEffect(() => {
+    if (!playingVideoId || !playerContainerRef.current) return;
+
+    setProgress(0);
+    setBuffered(0);
+    setCurrentTime(0);
+    setDuration(0);
+
+    if (playerRef.current) {
+      try {
+        playerRef.current.destroy();
+      } catch (_) {
+        /* ignore */
+      }
+      playerRef.current = null;
+    }
+    stopPolling();
+
+    const container = playerContainerRef.current;
+    container.innerHTML = "";
+    const div = document.createElement("div");
+    div.id = `yt-player-${playingVideoId}`;
+    container.appendChild(div);
+
+    const createPlayer = () => {
+      playerRef.current = new window.YT.Player(div, {
+        videoId: playingVideoId,
+        playerVars: {
+          autoplay: 1,
+          controls: 0,
+          rel: 0,
+          modestbranding: 1,
+          playsinline: 1,
+        },
+        events: {
+          onReady: (e) => {
+            if (isPlayingRef.current) e.target.playVideo();
+            startPolling();
+          },
+          onStateChange: (e) => {
+            if (e.data === 0 && hasNextRef.current) playNextRef.current();
+          },
+        },
+      });
+    };
+
+    if (window.YT?.Player) {
+      createPlayer();
+    } else {
+      const prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        prev?.();
+        createPlayer();
+      };
+    }
+
+    return () => {
+      stopPolling();
+    };
+  }, [playingVideoId, startPolling, stopPolling]);
+
+  // Sync play/pause state
+  useEffect(() => {
+    const p = playerRef.current;
+    if (!p) return;
+    try {
+      if (isPlaying) {
+        p.playVideo();
+        startPolling();
+      } else {
+        p.pauseVideo();
+        stopPolling();
+      }
+    } catch (_) {
+      /* ignore */
+    }
+  }, [isPlaying, startPolling, stopPolling]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopPolling();
+      try {
+        playerRef.current?.destroy();
+      } catch (_) {
+        /* ignore */
+      }
+    };
+  }, [stopPolling]);
 
   return (
     <AnimatePresence>
@@ -40,19 +206,42 @@ export default function MiniPlayerBar() {
           exit={{ y: 80, opacity: 0 }}
           transition={{ type: "spring", stiffness: 320, damping: 30 }}
           data-ocid="mini-player.bar"
-          className="fixed bottom-0 left-0 right-0 z-50 glass-card"
+          className="fixed bottom-0 left-0 right-0 z-50 glass-card relative"
           style={{
             borderTop: `1px solid ${currentMoodConfig.borderColor}`,
             boxShadow: `0 -4px 32px ${currentMoodConfig.glowColor}, 0 -1px 0 ${currentMoodConfig.borderColor}`,
           }}
         >
-          {/* Hidden YouTube iframe with JS API enabled */}
-          <iframe
-            ref={iframeRef}
-            key={playingVideoId}
-            src={`https://www.youtube.com/embed/${playingVideoId}?autoplay=1&controls=0&rel=0&modestbranding=1&enablejsapi=1`}
-            title="mini-player-audio"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          {/* Live progress bar at top edge */}
+          <div
+            className="absolute top-0 left-0 right-0 h-1 overflow-hidden"
+            style={{ borderRadius: 0, zIndex: 10 }}
+          >
+            {/* Buffer layer */}
+            <div
+              className="absolute top-0 left-0 h-full"
+              style={{
+                width: `${buffered * 100}%`,
+                background: currentMoodConfig.textColor,
+                opacity: 0.25,
+                transition: "width 0.4s ease",
+              }}
+            />
+            {/* Playback layer */}
+            <div
+              className="absolute top-0 left-0 h-full"
+              style={{
+                width: `${progress * 100}%`,
+                background: currentMoodConfig.textColor,
+                boxShadow: `0 0 6px ${currentMoodConfig.glowColor}`,
+                transition: "width 0.5s linear",
+              }}
+            />
+          </div>
+
+          {/* Hidden YT player container */}
+          <div
+            ref={playerContainerRef}
             style={{
               position: "absolute",
               width: 1,
@@ -61,6 +250,7 @@ export default function MiniPlayerBar() {
               pointerEvents: "none",
               bottom: 0,
               left: 0,
+              overflow: "hidden",
             }}
           />
 
@@ -75,7 +265,6 @@ export default function MiniPlayerBar() {
                 alt={playingSong.title}
                 className="w-full h-full object-cover"
               />
-              {/* Pulsing overlay when playing */}
               <motion.div
                 animate={
                   isPlaying ? { opacity: [0.6, 0.9, 0.6] } : { opacity: 0.85 }
@@ -86,7 +275,7 @@ export default function MiniPlayerBar() {
                   ease: "easeInOut",
                 }}
                 className="absolute inset-0 flex items-center justify-center"
-                style={{ background: `${currentMoodConfig.bgColor}` }}
+                style={{ background: currentMoodConfig.bgColor }}
               >
                 <motion.div
                   animate={isPlaying ? { scale: [1, 1.2, 1] } : { scale: 1 }}
@@ -101,7 +290,7 @@ export default function MiniPlayerBar() {
               </motion.div>
             </div>
 
-            {/* Song info */}
+            {/* Song info + time */}
             <div className="flex-1 min-w-0">
               <p
                 className="text-sm font-semibold truncate leading-tight"
@@ -112,6 +301,14 @@ export default function MiniPlayerBar() {
               <p className="text-xs text-muted-foreground truncate mt-0.5">
                 {playingSong.artist}
               </p>
+              {duration > 0 && (
+                <p
+                  className="text-xs tabular-nums mt-0.5"
+                  style={{ color: currentMoodConfig.textColor, opacity: 0.6 }}
+                >
+                  {formatTime(currentTime)} / {formatTime(duration)}
+                </p>
+              )}
             </div>
 
             {/* Mood badge */}
@@ -135,7 +332,7 @@ export default function MiniPlayerBar() {
               {isPlaying ? "Now Playing" : "Paused"}
             </span>
 
-            {/* Prev control */}
+            {/* Prev */}
             <button
               type="button"
               onClick={playPrev}
@@ -168,7 +365,7 @@ export default function MiniPlayerBar() {
               )}
             </button>
 
-            {/* Next control */}
+            {/* Next */}
             <button
               type="button"
               onClick={playNext}

@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Camera,
   ChevronDown,
@@ -8,8 +9,11 @@ import {
   Heart,
   Music,
   Music2,
+  Plus,
   Shuffle,
   Trash2,
+  UserPlus,
+  X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { Suspense, lazy, useEffect, useState } from "react";
@@ -35,6 +39,59 @@ interface MoodConfig {
   bgColor: string;
   description: string;
   songs: Song[];
+}
+
+interface UserSong {
+  mood: string;
+  title: string;
+  artist: string;
+  videoId: string;
+}
+
+const USER_SONGS_KEY = "vibechain_user_songs";
+
+function loadUserSongs(): UserSong[] {
+  try {
+    const raw = localStorage.getItem(USER_SONGS_KEY);
+    return raw ? (JSON.parse(raw) as UserSong[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveUserSongs(songs: UserSong[]) {
+  localStorage.setItem(USER_SONGS_KEY, JSON.stringify(songs));
+}
+
+function extractYouTubeId(input: string): string | null {
+  const str = input.trim();
+  // Plain 11-char video ID
+  if (/^[A-Za-z0-9_-]{11}$/.test(str)) return str;
+  try {
+    const url = new URL(str.startsWith("http") ? str : `https://${str}`);
+    // youtu.be/<id>
+    if (url.hostname === "youtu.be") {
+      const id = url.pathname.slice(1).split("/")[0];
+      if (id && id.length === 11) return id;
+    }
+    // youtube.com/watch?v=<id> or music.youtube.com/watch?v=<id>
+    if (
+      url.hostname.includes("youtube.com") ||
+      url.hostname.includes("music.youtube.com")
+    ) {
+      const v = url.searchParams.get("v");
+      if (v && v.length === 11) return v;
+      // youtube.com/shorts/<id>
+      const shortsMatch = url.pathname.match(/\/shorts\/([A-Za-z0-9_-]{11})/);
+      if (shortsMatch) return shortsMatch[1];
+      // youtube.com/embed/<id>
+      const embedMatch = url.pathname.match(/\/embed\/([A-Za-z0-9_-]{11})/);
+      if (embedMatch) return embedMatch[1];
+    }
+  } catch {
+    // not a URL
+  }
+  return null;
 }
 
 const MOODS: Record<string, MoodConfig> = {
@@ -486,12 +543,30 @@ function PulsingMusicIcon({ color }: { color: string }) {
   );
 }
 
+interface AddSongFormState {
+  title: string;
+  artist: string;
+  url: string;
+  error: string;
+}
+
+const EMPTY_FORM: AddSongFormState = {
+  title: "",
+  artist: "",
+  url: "",
+  error: "",
+};
+
 export default function VibeListen() {
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<FavSong[]>(loadFavorites);
+  const [userSongs, setUserSongs] = useState<UserSong[]>(loadUserSongs);
   const [showAllFavorites, setShowAllFavorites] = useState(false);
   const [shuffledSong, setShuffledSong] = useState<Song | null>(null);
   const [showFaceDetector, setShowFaceDetector] = useState(false);
+  // Per-mood add form open state
+  const [addFormOpen, setAddFormOpen] = useState(false);
+  const [addForm, setAddForm] = useState<AddSongFormState>(EMPTY_FORM);
 
   const {
     playingVideoId,
@@ -502,6 +577,10 @@ export default function VibeListen() {
   useEffect(() => {
     saveFavorites(favorites);
   }, [favorites]);
+
+  useEffect(() => {
+    saveUserSongs(userSongs);
+  }, [userSongs]);
 
   const toggleFavorite = (song: Song, mood: string) => {
     setFavorites((prev) => {
@@ -516,19 +595,31 @@ export default function VibeListen() {
     setFavorites((prev) => prev.filter((f) => f.videoId !== videoId));
   };
 
+  const removeUserSong = (videoId: string) => {
+    setUserSongs((prev) => prev.filter((s) => s.videoId !== videoId));
+  };
+
   const currentMood = selectedMood ? MOODS[selectedMood] : null;
+
+  // Merged song list (curated + user) for current mood
+  const currentUserSongs = selectedMood
+    ? userSongs.filter((s) => s.mood === selectedMood)
+    : [];
+
+  const mergedSongs: Song[] = currentMood
+    ? [...currentMood.songs, ...currentUserSongs]
+    : [];
 
   const handleShuffle = () => {
     if (!currentMood || !selectedMood) return;
-    const songs = currentMood.songs;
-    const randomIdx = Math.floor(Math.random() * songs.length);
-    const random = songs[randomIdx];
+    const randomIdx = Math.floor(Math.random() * mergedSongs.length);
+    const random = mergedSongs[randomIdx];
     setShuffledSong(random);
     ctxPlaySong(
       random.videoId,
       { title: random.title, artist: random.artist },
       currentMood,
-      songs,
+      mergedSongs,
       randomIdx,
     );
   };
@@ -538,16 +629,52 @@ export default function VibeListen() {
     if (playingVideoId === song.videoId) {
       stopPlaying();
     } else {
-      const songs = currentMood.songs;
-      const idx = songs.findIndex((s) => s.videoId === song.videoId);
+      const idx = mergedSongs.findIndex((s) => s.videoId === song.videoId);
       ctxPlaySong(
         song.videoId,
         { title: song.title, artist: song.artist },
         currentMood,
-        songs,
+        mergedSongs,
         idx >= 0 ? idx : 0,
       );
     }
+  };
+
+  const handleAddSong = () => {
+    const { title, artist, url } = addForm;
+    if (!title.trim() || !artist.trim() || !url.trim()) {
+      setAddForm((f) => ({ ...f, error: "Please fill in all fields." }));
+      return;
+    }
+    const videoId = extractYouTubeId(url);
+    if (!videoId) {
+      setAddForm((f) => ({
+        ...f,
+        error: "Invalid YouTube URL or video ID. Please check and try again.",
+      }));
+      return;
+    }
+    if (!selectedMood) return;
+    // Avoid duplicates in this mood
+    const alreadyExists = mergedSongs.some((s) => s.videoId === videoId);
+    if (alreadyExists) {
+      setAddForm((f) => ({
+        ...f,
+        error: "This song is already in the list.",
+      }));
+      return;
+    }
+    setUserSongs((prev) => [
+      ...prev,
+      {
+        mood: selectedMood,
+        title: title.trim(),
+        artist: artist.trim(),
+        videoId,
+      },
+    ]);
+    setAddForm(EMPTY_FORM);
+    setAddFormOpen(false);
   };
 
   const moodFavorites = selectedMood
@@ -660,6 +787,10 @@ export default function VibeListen() {
                 isActive={selectedMood === key}
                 ocid="vibe-listen.mood.button"
                 onClick={() => {
+                  if (selectedMood !== key) {
+                    setAddFormOpen(false);
+                    setAddForm(EMPTY_FORM);
+                  }
                   setSelectedMood(selectedMood === key ? null : key);
                   setShuffledSong(null);
                 }}
@@ -819,7 +950,7 @@ export default function VibeListen() {
                   {currentMood.label} Vibes
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  {currentMood.songs.length} songs · tap any row to play
+                  {mergedSongs.length} songs · tap any row to play
                 </p>
               </div>
               <Button
@@ -929,7 +1060,7 @@ export default function VibeListen() {
               )}
             </AnimatePresence>
 
-            {/* Song rows */}
+            {/* Curated Song rows */}
             <div className="grid gap-2">
               {currentMood.songs.map((song, idx) => {
                 const saved = isFavorited(favorites, song.videoId);
@@ -1076,6 +1207,374 @@ export default function VibeListen() {
                   </motion.div>
                 );
               })}
+
+              {/* User-added songs */}
+              <AnimatePresence>
+                {currentUserSongs.map((song, uIdx) => {
+                  const globalIdx = currentMood.songs.length + uIdx;
+                  const saved = isFavorited(favorites, song.videoId);
+                  const isCurrentlyPlaying = playingVideoId === song.videoId;
+                  return (
+                    <motion.div
+                      key={`user-${song.videoId}`}
+                      initial={{ opacity: 0, x: -16, scale: 0.97 }}
+                      animate={{ opacity: 1, x: 0, scale: 1 }}
+                      exit={{ opacity: 0, x: 16, scale: 0.97 }}
+                      transition={{ duration: 0.3 }}
+                      data-ocid={`vibe-listen.songs.item.${globalIdx + 1}`}
+                      onClick={() => playSong(song)}
+                      className="glass-card rounded-xl overflow-hidden group flex items-center gap-3 px-4 py-3 transition-all duration-200 hover:scale-[1.01] cursor-pointer"
+                      style={{
+                        boxShadow: isCurrentlyPlaying
+                          ? `0 0 28px ${currentMood.glowColor}, 0 0 56px ${currentMood.glowColor.replace("0.5)", "0.2)")}`
+                          : saved
+                            ? "0 0 12px oklch(0.72 0.28 345 / 0.3)"
+                            : undefined,
+                        background: isCurrentlyPlaying
+                          ? currentMood.bgColor
+                          : undefined,
+                        border: isCurrentlyPlaying
+                          ? `1px solid ${currentMood.borderColor}`
+                          : `1px solid ${currentMood.borderColor.replace("0.5)", "0.18)")}`,
+                      }}
+                    >
+                      {/* Number / playing icon */}
+                      <span
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
+                        style={
+                          isCurrentlyPlaying
+                            ? {
+                                background: currentMood.glowColor,
+                                color: "white",
+                              }
+                            : {
+                                background: currentMood.bgColor,
+                                color: currentMood.textColor,
+                              }
+                        }
+                      >
+                        {isCurrentlyPlaying ? (
+                          <PulsingMusicIcon color="white" />
+                        ) : (
+                          globalIdx + 1
+                        )}
+                      </span>
+
+                      {/* Thumbnail */}
+                      <div
+                        className="flex-shrink-0 relative rounded-lg overflow-hidden"
+                        style={{ width: 60, height: 45 }}
+                      >
+                        <img
+                          src={`https://img.youtube.com/vi/${song.videoId}/hqdefault.jpg`}
+                          alt={song.title}
+                          className="w-full h-full object-cover"
+                        />
+                        {!isCurrentlyPlaying && (
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Music2 className="w-4 h-4 text-white" />
+                          </div>
+                        )}
+                        {isCurrentlyPlaying && (
+                          <div
+                            className="absolute inset-0 flex items-center justify-center"
+                            style={{ background: currentMood.bgColor }}
+                          >
+                            <PulsingMusicIcon color={currentMood.textColor} />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p
+                            className="text-sm font-semibold truncate"
+                            style={{
+                              color: isCurrentlyPlaying
+                                ? currentMood.textColor
+                                : undefined,
+                            }}
+                            title={song.title}
+                          >
+                            {song.title}
+                          </p>
+                          {/* User-added badge */}
+                          <span
+                            className="flex-shrink-0 flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                            style={{
+                              background: currentMood.bgColor,
+                              color: currentMood.textColor,
+                              border: `1px solid ${currentMood.borderColor}`,
+                            }}
+                          >
+                            <UserPlus className="w-2.5 h-2.5" />
+                            You
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">
+                          {song.artist}
+                        </p>
+                        {!isCurrentlyPlaying && (
+                          <p
+                            className="text-xs opacity-50 mt-0.5"
+                            style={{ color: currentMood.textColor }}
+                          >
+                            Tap to play
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Actions */}
+                      <div
+                        className="flex items-center gap-1 flex-shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        role="presentation"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => toggleFavorite(song, selectedMood)}
+                          data-ocid={`vibe-listen.user_song.favorite_button.${uIdx + 1}`}
+                          className="p-2 rounded-lg transition-all duration-200 hover:scale-110"
+                          aria-label={
+                            saved
+                              ? "Remove from favorites"
+                              : "Save to favorites"
+                          }
+                        >
+                          <Heart
+                            className="w-4 h-4 transition-all"
+                            style={{
+                              fill: saved
+                                ? "oklch(0.80 0.22 345)"
+                                : "transparent",
+                              stroke: saved
+                                ? "oklch(0.80 0.22 345)"
+                                : "currentColor",
+                            }}
+                          />
+                        </button>
+                        <a
+                          href={`https://youtube.com/watch?v=${song.videoId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          data-ocid="vibe-listen.user_song.play.button"
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          className="p-2 rounded-lg hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors"
+                          title="Open in YouTube"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeUserSong(song.videoId);
+                          }}
+                          data-ocid={`vibe-listen.user_song.delete_button.${uIdx + 1}`}
+                          className="p-2 rounded-lg hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                          aria-label="Remove song"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
+
+            {/* Add a Song section */}
+            <div className="mt-6">
+              {/* Toggle button */}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                data-ocid="vibe-listen.add_song.button"
+                onClick={() => {
+                  setAddFormOpen((v) => !v);
+                  setAddForm(EMPTY_FORM);
+                }}
+                className="gap-2 rounded-xl border transition-all hover:scale-105"
+                style={{
+                  borderColor: currentMood.borderColor,
+                  color: currentMood.textColor,
+                  background: currentMood.bgColor,
+                }}
+              >
+                {addFormOpen ? (
+                  <>
+                    <X className="w-4 h-4" />
+                    Cancel
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" />
+                    Add a Song
+                  </>
+                )}
+              </Button>
+
+              {/* Collapsible form */}
+              <AnimatePresence>
+                {addFormOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0, y: -8 }}
+                    animate={{ opacity: 1, height: "auto", y: 0 }}
+                    exit={{ opacity: 0, height: 0, y: -8 }}
+                    transition={{ duration: 0.28, ease: "easeOut" }}
+                    className="overflow-hidden"
+                  >
+                    <div
+                      className="glass-card rounded-2xl p-5 mt-3"
+                      style={{
+                        border: `1px solid ${currentMood.borderColor}`,
+                        boxShadow: `0 0 20px ${currentMood.glowColor.replace("0.5)", "0.15)")}`,
+                      }}
+                      data-ocid="vibe-listen.add_song.panel"
+                    >
+                      <div className="flex items-center gap-2 mb-4">
+                        <UserPlus
+                          className="w-4 h-4"
+                          style={{ color: currentMood.textColor }}
+                        />
+                        <span
+                          className="text-sm font-semibold"
+                          style={{ color: currentMood.textColor }}
+                        >
+                          Add your song to {currentMood.label} vibes
+                        </span>
+                      </div>
+
+                      <div className="grid gap-3">
+                        <div>
+                          <label
+                            className="text-xs text-muted-foreground mb-1 block"
+                            htmlFor="add-song-title"
+                          >
+                            Song Title
+                          </label>
+                          <Input
+                            id="add-song-title"
+                            placeholder="e.g. Tum Hi Ho"
+                            value={addForm.title}
+                            onChange={(e) =>
+                              setAddForm((f) => ({
+                                ...f,
+                                title: e.target.value,
+                                error: "",
+                              }))
+                            }
+                            data-ocid="vibe-listen.add_song.title.input"
+                            className="bg-transparent border-border/50 focus:border-current rounded-lg text-sm"
+                            style={{
+                              borderColor: currentMood.borderColor.replace(
+                                "0.5)",
+                                "0.35)",
+                              ),
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label
+                            className="text-xs text-muted-foreground mb-1 block"
+                            htmlFor="add-song-artist"
+                          >
+                            Artist
+                          </label>
+                          <Input
+                            id="add-song-artist"
+                            placeholder="e.g. Arijit Singh"
+                            value={addForm.artist}
+                            onChange={(e) =>
+                              setAddForm((f) => ({
+                                ...f,
+                                artist: e.target.value,
+                                error: "",
+                              }))
+                            }
+                            data-ocid="vibe-listen.add_song.artist.input"
+                            className="bg-transparent border-border/50 focus:border-current rounded-lg text-sm"
+                            style={{
+                              borderColor: currentMood.borderColor.replace(
+                                "0.5)",
+                                "0.35)",
+                              ),
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label
+                            className="text-xs text-muted-foreground mb-1 block"
+                            htmlFor="add-song-url"
+                          >
+                            YouTube URL or Video ID
+                          </label>
+                          <Input
+                            id="add-song-url"
+                            placeholder="https://youtube.com/watch?v=... or video ID"
+                            value={addForm.url}
+                            onChange={(e) =>
+                              setAddForm((f) => ({
+                                ...f,
+                                url: e.target.value,
+                                error: "",
+                              }))
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleAddSong();
+                            }}
+                            data-ocid="vibe-listen.add_song.url.input"
+                            className="bg-transparent border-border/50 focus:border-current rounded-lg text-sm font-mono"
+                            style={{
+                              borderColor: currentMood.borderColor.replace(
+                                "0.5)",
+                                "0.35)",
+                              ),
+                            }}
+                          />
+                        </div>
+
+                        {/* Inline error */}
+                        <AnimatePresence>
+                          {addForm.error && (
+                            <motion.p
+                              initial={{ opacity: 0, y: -4 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -4 }}
+                              transition={{ duration: 0.18 }}
+                              data-ocid="vibe-listen.add_song.error_state"
+                              className="text-xs text-destructive font-medium"
+                            >
+                              {addForm.error}
+                            </motion.p>
+                          )}
+                        </AnimatePresence>
+
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleAddSong}
+                          data-ocid="vibe-listen.add_song.submit_button"
+                          className="w-full rounded-xl font-semibold mt-1 gap-2"
+                          style={{
+                            background: currentMood.bgColor,
+                            color: currentMood.textColor,
+                            border: `1px solid ${currentMood.borderColor}`,
+                            boxShadow: `0 0 16px ${currentMood.glowColor.replace("0.5)", "0.2)")}`,
+                          }}
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add Song
+                        </Button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </motion.section>
         )}
