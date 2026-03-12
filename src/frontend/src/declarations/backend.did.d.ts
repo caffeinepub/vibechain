@@ -32,6 +32,7 @@ export interface Vibe {
 }
 export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  'registerCaller' : ActorMethod<[], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'createCircle' : ActorMethod<[string, string], undefined>,
   'deleteCircle' : ActorMethod<[string], undefined>,

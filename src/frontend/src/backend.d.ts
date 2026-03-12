@@ -33,6 +33,7 @@ export enum UserRole {
     guest = "guest"
 }
 export interface backendInterface {
+    registerCaller(): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     createCircle(name: string, description: string): Promise<void>;
     deleteCircle(circleName: string): Promise<void>;
@@ -52,4 +53,5 @@ export interface backendInterface {
     postVibe(mood: string, songTitle: string, artistName: string, message: string | null): Promise<void>;
     saveCallerUserProfile(profile: Profile): Promise<void>;
     updateProfile(username: string, bio: string): Promise<void>;
+    _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
 }

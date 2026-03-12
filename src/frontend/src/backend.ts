@@ -116,6 +116,7 @@ export enum UserRole {
 }
 export interface backendInterface {
     _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
+    registerCaller(): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     createCircle(name: string, description: string): Promise<void>;
     deleteCircle(circleName: string): Promise<void>;
@@ -150,6 +151,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor._initializeAccessControlWithSecret(arg0);
+            return result;
+        }
+    }
+    async registerCaller(): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.registerCaller();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.registerCaller();
             return result;
         }
     }

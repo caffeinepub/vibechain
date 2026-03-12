@@ -2,7 +2,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Headphones, Music, Trash2, Youtube } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+const STORAGE_KEY = "vibechain_music_embeds";
 
 function getYouTubeEmbedId(url: string): string | null {
   try {
@@ -32,10 +34,33 @@ interface EmbedEntry {
   videoId: string;
 }
 
+function loadEmbeds(): EmbedEntry[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as EmbedEntry[];
+  } catch {
+    return [];
+  }
+}
+
+function saveEmbeds(embeds: EmbedEntry[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(embeds));
+  } catch {
+    // storage full or unavailable
+  }
+}
+
 export default function MusicPage() {
   const [url, setUrl] = useState("");
-  const [embeds, setEmbeds] = useState<EmbedEntry[]>([]);
+  const [embeds, setEmbeds] = useState<EmbedEntry[]>(loadEmbeds);
   const [error, setError] = useState("");
+
+  // Persist whenever embeds change
+  useEffect(() => {
+    saveEmbeds(embeds);
+  }, [embeds]);
 
   const handleAdd = () => {
     const trimmed = url.trim();
@@ -69,7 +94,8 @@ export default function MusicPage() {
           Music
         </h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Paste a YouTube or YouTube Music link to embed it.
+          Paste a YouTube or YouTube Music link to embed it. Your playlist is
+          saved automatically.
         </p>
       </motion.div>
 

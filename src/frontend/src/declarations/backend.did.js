@@ -33,6 +33,7 @@ export const Profile = IDL.Record({ 'bio' : IDL.Text, 'username' : IDL.Text });
 
 export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+  'registerCaller' : IDL.Func([], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'createCircle' : IDL.Func([IDL.Text, IDL.Text], [], []),
   'deleteCircle' : IDL.Func([IDL.Text], [], []),
@@ -95,6 +96,7 @@ export const idlFactory = ({ IDL }) => {
   return IDL.Service({
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'registerCaller' : IDL.Func([], [], []),
     'createCircle' : IDL.Func([IDL.Text, IDL.Text], [], []),
     'deleteCircle' : IDL.Func([IDL.Text], [], []),
     'deleteVibe' : IDL.Func([IDL.Nat], [], []),
