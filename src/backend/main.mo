@@ -71,6 +71,15 @@ actor {
   let moodSongs = Map.empty<Nat, MoodSong>();
   var nextMoodSongId = 0;
 
+  // Auto-register any authenticated (non-anonymous) caller as a user if not already registered
+  func ensureRegistered(caller : Principal) {
+    if (caller.isAnonymous()) { return };
+    switch (accessControlState.userRoles.get(caller)) {
+      case (?_) {}; // Already registered
+      case (null) { accessControlState.userRoles.add(caller, #user) };
+    };
+  };
+
   // Profile Management
   public query ({ caller }) func getCallerUserProfile() : async ?Profile {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
@@ -87,6 +96,7 @@ actor {
   };
 
   public shared ({ caller }) func saveCallerUserProfile(profile : Profile) : async () {
+    ensureRegistered(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can save profiles");
     };
@@ -101,6 +111,7 @@ actor {
   };
 
   public shared ({ caller }) func updateProfile(username : Text, bio : Text) : async () {
+    ensureRegistered(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can update profiles");
     };
@@ -123,6 +134,7 @@ actor {
 
   // Vibe Management
   public shared ({ caller }) func postVibe(mood : Text, songTitle : Text, artistName : Text, message : ?Text) : async () {
+    ensureRegistered(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can post vibes");
     };
@@ -155,6 +167,7 @@ actor {
   };
 
   public shared ({ caller }) func deleteVibe(vibeId : Nat) : async () {
+    ensureRegistered(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can delete vibes");
     };
@@ -172,6 +185,7 @@ actor {
 
   // Mood Songs (user-added songs visible to all)
   public shared ({ caller }) func addMoodSong(mood : Text, title : Text, artist : Text, videoId : Text) : async Nat {
+    ensureRegistered(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can add songs");
     };
@@ -208,6 +222,7 @@ actor {
   };
 
   public shared ({ caller }) func deleteMoodSong(songId : Nat) : async () {
+    ensureRegistered(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can delete songs");
     };
@@ -225,6 +240,7 @@ actor {
 
   // Vibe Circles
   public shared ({ caller }) func createCircle(name : Text, description : Text) : async () {
+    ensureRegistered(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can create circles");
     };
@@ -240,6 +256,7 @@ actor {
   };
 
   public shared ({ caller }) func joinCircle(circleName : Text) : async () {
+    ensureRegistered(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can join circles");
     };
@@ -262,6 +279,7 @@ actor {
   };
 
   public shared ({ caller }) func leaveCircle(circleName : Text) : async () {
+    ensureRegistered(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can leave circles");
     };
@@ -313,6 +331,7 @@ actor {
   };
 
   public shared ({ caller }) func deleteCircle(circleName : Text) : async () {
+    ensureRegistered(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can delete circles");
     };

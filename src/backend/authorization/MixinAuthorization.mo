@@ -15,6 +15,17 @@ mixin (accessControlState : AccessControl.AccessControlState) {
     };
   };
 
+  // Register the caller as a user (auto-promotes from guest to user)
+  public shared ({ caller }) func registerCaller() : async () {
+    if (caller.isAnonymous()) { return };
+    switch (accessControlState.userRoles.get(caller)) {
+      case (?_) {}; // Already registered, do nothing
+      case (null) {
+        accessControlState.userRoles.add(caller, #user);
+      };
+    };
+  };
+
   public query ({ caller }) func getCallerUserRole() : async AccessControl.UserRole {
     AccessControl.getUserRole(accessControlState, caller);
   };
