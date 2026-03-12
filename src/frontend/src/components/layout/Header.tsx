@@ -3,22 +3,44 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Loader2, LogOut, Music2, Plus, User, Waves } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import {
+  Headphones,
+  Loader2,
+  LogOut,
+  Music2,
+  Plus,
+  Shield,
+  User,
+  Waves,
+} from "lucide-react";
+import { useActor } from "../../hooks/useActor";
 import { useInternetIdentity } from "../../hooks/useInternetIdentity";
 
 export default function Header() {
   const { identity, login, clear, isLoggingIn, isInitializing } =
     useInternetIdentity();
+  const { actor, isFetching } = useActor();
   const routerState = useRouterState();
   const currentPath = routerState.location.pathname;
+
+  const { data: isAdmin } = useQuery<boolean>({
+    queryKey: ["isAdmin", identity?.getPrincipal().toString()],
+    queryFn: async () => {
+      if (!actor) return false;
+      return actor.isCallerAdmin();
+    },
+    enabled: !!actor && !isFetching && !!identity,
+  });
 
   const navLinks = [
     { to: "/feed", label: "Feed", icon: <Waves className="w-4 h-4" /> },
     { to: "/circles", label: "Circles", icon: <Music2 className="w-4 h-4" /> },
+    { to: "/music", label: "Music", icon: <Headphones className="w-4 h-4" /> },
   ];
 
   return (
@@ -90,6 +112,20 @@ export default function Header() {
                       <User className="w-4 h-4 mr-2" /> My Profile
                     </Link>
                   </DropdownMenuItem>
+                  {isAdmin && (
+                    <>
+                      <DropdownMenuSeparator className="bg-border/50" />
+                      <DropdownMenuItem asChild>
+                        <Link to="/admin" data-ocid="nav.admin.link">
+                          <Shield className="w-4 h-4 mr-2 text-primary" />
+                          <span className="text-primary font-medium">
+                            Admin
+                          </span>
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  <DropdownMenuSeparator className="bg-border/50" />
                   <DropdownMenuItem
                     onClick={clear}
                     className="text-destructive focus:text-destructive"

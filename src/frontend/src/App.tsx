@@ -11,8 +11,10 @@ import {
 import Footer from "./components/layout/Footer";
 import Header from "./components/layout/Header";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
+import AdminPage from "./pages/AdminPage";
 import FeedPage from "./pages/FeedPage";
 import LandingPage from "./pages/LandingPage";
+import MusicPage from "./pages/MusicPage";
 import PostVibePage from "./pages/PostVibePage";
 import ProfilePage from "./pages/ProfilePage";
 import VibeCirclesPage from "./pages/VibeCirclesPage";
@@ -76,6 +78,18 @@ const profileRoute = createRoute({
   component: ProfilePage,
 });
 
+const musicRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/music",
+  component: MusicPage,
+});
+
+const adminRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin",
+  component: AdminPage,
+});
+
 const notFoundRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "*",
@@ -96,6 +110,8 @@ const routeTree = rootRoute.addChildren([
   postRoute,
   circlesRoute,
   profileRoute,
+  musicRoute,
+  adminRoute,
   notFoundRoute,
 ]);
 
