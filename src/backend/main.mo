@@ -185,10 +185,10 @@ actor {
 
   // Mood Songs (user-added songs visible to all)
   public shared ({ caller }) func addMoodSong(mood : Text, title : Text, artist : Text, videoId : Text) : async Nat {
-    ensureRegistered(caller);
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can add songs");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be logged in to add songs");
     };
+    ensureRegistered(caller);
 
     let song : MoodSong = {
       id = nextMoodSongId;
@@ -222,10 +222,10 @@ actor {
   };
 
   public shared ({ caller }) func deleteMoodSong(songId : Nat) : async () {
-    ensureRegistered(caller);
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can delete songs");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be logged in to delete songs");
     };
+    ensureRegistered(caller);
 
     switch (moodSongs.get(songId)) {
       case (null) { Runtime.trap("Song not found") };

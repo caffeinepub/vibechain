@@ -29,23 +29,28 @@ export const Vibe = IDL.Record({
   'timestamp' : Time,
   'artistName' : IDL.Text,
 });
+export const Profile = IDL.Record({ 'bio' : IDL.Text, 'username' : IDL.Text });
 export const MoodSong = IDL.Record({
   'id' : IDL.Nat,
-  'mood' : IDL.Text,
   'title' : IDL.Text,
-  'artist' : IDL.Text,
-  'videoId' : IDL.Text,
+  'mood' : IDL.Text,
   'addedBy' : IDL.Principal,
   'timestamp' : Time,
+  'artist' : IDL.Text,
+  'videoId' : IDL.Text,
 });
-export const Profile = IDL.Record({ 'bio' : IDL.Text, 'username' : IDL.Text });
 
 export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
-  'registerCaller' : IDL.Func([], [], []),
+  'addMoodSong' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Text, IDL.Text],
+      [IDL.Nat],
+      [],
+    ),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'createCircle' : IDL.Func([IDL.Text, IDL.Text], [], []),
   'deleteCircle' : IDL.Func([IDL.Text], [], []),
+  'deleteMoodSong' : IDL.Func([IDL.Nat], [], []),
   'deleteVibe' : IDL.Func([IDL.Nat], [], []),
   'getAllCircles' : IDL.Func(
       [],
@@ -61,7 +66,13 @@ export const idlService = IDL.Service({
       [IDL.Vec(IDL.Principal)],
       ['query'],
     ),
+  'getMoodSongs' : IDL.Func([IDL.Text], [IDL.Vec(MoodSong)], ['query']),
   'getProfile' : IDL.Func([IDL.Principal], [IDL.Opt(Profile)], ['query']),
+  'getPublicUsername' : IDL.Func(
+      [IDL.Principal],
+      [IDL.Opt(IDL.Text)],
+      ['query'],
+    ),
   'getUserProfile' : IDL.Func([IDL.Principal], [IDL.Opt(Profile)], ['query']),
   'getUserVibes' : IDL.Func([IDL.Principal], [IDL.Vec(Vibe)], ['query']),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
@@ -74,10 +85,6 @@ export const idlService = IDL.Service({
     ),
   'saveCallerUserProfile' : IDL.Func([Profile], [], []),
   'updateProfile' : IDL.Func([IDL.Text, IDL.Text], [], []),
-  'addMoodSong' : IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
-  'getMoodSongs' : IDL.Func([IDL.Text], [IDL.Vec(MoodSong)], ['query']),
-  'deleteMoodSong' : IDL.Func([IDL.Nat], [], []),
-  'getPublicUsername' : IDL.Func([IDL.Principal], [IDL.Opt(IDL.Text)], ['query']),
 });
 
 export const idlInitArgs = [];
@@ -104,23 +111,28 @@ export const idlFactory = ({ IDL }) => {
     'timestamp' : Time,
     'artistName' : IDL.Text,
   });
+  const Profile = IDL.Record({ 'bio' : IDL.Text, 'username' : IDL.Text });
   const MoodSong = IDL.Record({
     'id' : IDL.Nat,
-    'mood' : IDL.Text,
     'title' : IDL.Text,
-    'artist' : IDL.Text,
-    'videoId' : IDL.Text,
+    'mood' : IDL.Text,
     'addedBy' : IDL.Principal,
     'timestamp' : Time,
+    'artist' : IDL.Text,
+    'videoId' : IDL.Text,
   });
-  const Profile = IDL.Record({ 'bio' : IDL.Text, 'username' : IDL.Text });
   
   return IDL.Service({
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+    'addMoodSong' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text, IDL.Text],
+        [IDL.Nat],
+        [],
+      ),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
-    'registerCaller' : IDL.Func([], [], []),
     'createCircle' : IDL.Func([IDL.Text, IDL.Text], [], []),
     'deleteCircle' : IDL.Func([IDL.Text], [], []),
+    'deleteMoodSong' : IDL.Func([IDL.Nat], [], []),
     'deleteVibe' : IDL.Func([IDL.Nat], [], []),
     'getAllCircles' : IDL.Func(
         [],
@@ -136,7 +148,13 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Principal)],
         ['query'],
       ),
+    'getMoodSongs' : IDL.Func([IDL.Text], [IDL.Vec(MoodSong)], ['query']),
     'getProfile' : IDL.Func([IDL.Principal], [IDL.Opt(Profile)], ['query']),
+    'getPublicUsername' : IDL.Func(
+        [IDL.Principal],
+        [IDL.Opt(IDL.Text)],
+        ['query'],
+      ),
     'getUserProfile' : IDL.Func([IDL.Principal], [IDL.Opt(Profile)], ['query']),
     'getUserVibes' : IDL.Func([IDL.Principal], [IDL.Vec(Vibe)], ['query']),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
@@ -149,10 +167,6 @@ export const idlFactory = ({ IDL }) => {
       ),
     'saveCallerUserProfile' : IDL.Func([Profile], [], []),
     'updateProfile' : IDL.Func([IDL.Text, IDL.Text], [], []),
-    'addMoodSong' : IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
-    'getMoodSongs' : IDL.Func([IDL.Text], [IDL.Vec(MoodSong)], ['query']),
-    'deleteMoodSong' : IDL.Func([IDL.Nat], [], []),
-    'getPublicUsername' : IDL.Func([IDL.Principal], [IDL.Opt(IDL.Text)], ['query']),
   });
 };
 

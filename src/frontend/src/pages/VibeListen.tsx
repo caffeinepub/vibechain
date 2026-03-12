@@ -23,6 +23,7 @@ import type {
 } from "../backend.d";
 import { useMiniPlayer } from "../context/MiniPlayerContext";
 import { useActor } from "../hooks/useActor";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
 const FaceEmotionDetector = lazy(
   () => import("../components/FaceEmotionDetector"),
@@ -560,8 +561,9 @@ export default function VibeListen() {
     playSong: ctxPlaySong,
     stopPlaying,
   } = useMiniPlayer();
-  const { actor: _actor } = useActor();
+  const { actor: _actor, isFetching: actorFetching } = useActor();
   const actor = _actor as unknown as FullBackendInterface | null;
+  const { identity } = useInternetIdentity();
 
   useEffect(() => {
     saveFavorites(favorites);
@@ -688,23 +690,38 @@ export default function VibeListen() {
       }));
       return;
     }
-    setAddForm((f) => ({ ...f, error: "" }));
-    try {
-      if (actor) {
-        await actor.addMoodSong(
-          selectedMood,
-          title.trim(),
-          artist.trim(),
-          videoId,
-        );
-        const songs = await actor.getMoodSongs(selectedMood);
-        setBackendSongs(songs);
-      }
-    } catch (_e) {
+    if (!identity) {
+      setAddForm((f) => ({ ...f, error: "Please log in to add songs." }));
+      return;
+    }
+    if (!actor || actorFetching) {
       setAddForm((f) => ({
         ...f,
-        error: "Failed to add song. Please try again.",
+        error: "Still connecting, please try again.",
       }));
+      return;
+    }
+    setAddForm((f) => ({ ...f, error: "" }));
+    try {
+      await actor.addMoodSong(
+        selectedMood,
+        title.trim(),
+        artist.trim(),
+        videoId,
+      );
+      const songs = await actor.getMoodSongs(selectedMood);
+      setBackendSongs(songs);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const friendly =
+        msg.toLowerCase().includes("unauthorized") ||
+        msg.toLowerCase().includes("not logged") ||
+        msg.toLowerCase().includes("anonymous")
+          ? "You must be logged in to add songs."
+          : msg.toLowerCase().includes("already")
+            ? "This song is already in the list."
+            : `Failed to add song: ${msg}`;
+      setAddForm((f) => ({ ...f, error: friendly }));
       return;
     }
     setAddForm(EMPTY_FORM);

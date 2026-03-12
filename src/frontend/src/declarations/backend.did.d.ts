@@ -16,6 +16,15 @@ export interface CircleView {
   'name' : string,
   'description' : string,
 }
+export interface MoodSong {
+  'id' : bigint,
+  'title' : string,
+  'mood' : string,
+  'addedBy' : Principal,
+  'timestamp' : Time,
+  'artist' : string,
+  'videoId' : string,
+}
 export interface Profile { 'bio' : string, 'username' : string }
 export type Time = bigint;
 export type UserRole = { 'admin' : null } |
@@ -30,21 +39,13 @@ export interface Vibe {
   'timestamp' : Time,
   'artistName' : string,
 }
-export interface MoodSong {
-  'id' : bigint,
-  'mood' : string,
-  'title' : string,
-  'artist' : string,
-  'videoId' : string,
-  'addedBy' : Principal,
-  'timestamp' : Time,
-}
 export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
-  'registerCaller' : ActorMethod<[], undefined>,
+  'addMoodSong' : ActorMethod<[string, string, string, string], bigint>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'createCircle' : ActorMethod<[string, string], undefined>,
   'deleteCircle' : ActorMethod<[string], undefined>,
+  'deleteMoodSong' : ActorMethod<[bigint], undefined>,
   'deleteVibe' : ActorMethod<[bigint], undefined>,
   'getAllCircles' : ActorMethod<[], Array<[string, CircleView]>>,
   'getAllVibes' : ActorMethod<[], Array<Vibe>>,
@@ -52,7 +53,9 @@ export interface _SERVICE {
   'getCallerUserProfile' : ActorMethod<[], [] | [Profile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getCircleMembers' : ActorMethod<[string], Array<Principal>>,
+  'getMoodSongs' : ActorMethod<[string], Array<MoodSong>>,
   'getProfile' : ActorMethod<[Principal], [] | [Profile]>,
+  'getPublicUsername' : ActorMethod<[Principal], [] | [string]>,
   'getUserProfile' : ActorMethod<[Principal], [] | [Profile]>,
   'getUserVibes' : ActorMethod<[Principal], Array<Vibe>>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
@@ -61,10 +64,6 @@ export interface _SERVICE {
   'postVibe' : ActorMethod<[string, string, string, [] | [string]], undefined>,
   'saveCallerUserProfile' : ActorMethod<[Profile], undefined>,
   'updateProfile' : ActorMethod<[string, string], undefined>,
-  'addMoodSong' : ActorMethod<[string, string, string, string], bigint>,
-  'getMoodSongs' : ActorMethod<[string], Array<MoodSong>>,
-  'deleteMoodSong' : ActorMethod<[bigint], undefined>,
-  'getPublicUsername' : ActorMethod<[Principal], [] | [string]>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

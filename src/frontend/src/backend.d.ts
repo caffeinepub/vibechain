@@ -22,19 +22,19 @@ export interface Vibe {
     timestamp: Time;
     artistName: string;
 }
-export interface MoodSong {
-    id: bigint;
-    mood: string;
-    title: string;
-    artist: string;
-    videoId: string;
-    addedBy: Principal;
-    timestamp: Time;
-}
 export type Time = bigint;
 export interface Profile {
     bio: string;
     username: string;
+}
+export interface MoodSong {
+    id: bigint;
+    title: string;
+    mood: string;
+    addedBy: Principal;
+    timestamp: Time;
+    artist: string;
+    videoId: string;
 }
 export enum UserRole {
     admin = "admin",
@@ -42,10 +42,11 @@ export enum UserRole {
     guest = "guest"
 }
 export interface backendInterface {
-    registerCaller(): Promise<void>;
+    addMoodSong(mood: string, title: string, artist: string, videoId: string): Promise<bigint>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     createCircle(name: string, description: string): Promise<void>;
     deleteCircle(circleName: string): Promise<void>;
+    deleteMoodSong(songId: bigint): Promise<void>;
     deleteVibe(vibeId: bigint): Promise<void>;
     getAllCircles(): Promise<Array<[string, CircleView]>>;
     getAllVibes(): Promise<Array<Vibe>>;
@@ -53,7 +54,9 @@ export interface backendInterface {
     getCallerUserProfile(): Promise<Profile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getCircleMembers(circleName: string): Promise<Array<Principal>>;
+    getMoodSongs(mood: string): Promise<Array<MoodSong>>;
     getProfile(user: Principal): Promise<Profile | null>;
+    getPublicUsername(user: Principal): Promise<string | null>;
     getUserProfile(user: Principal): Promise<Profile | null>;
     getUserVibes(user: Principal): Promise<Array<Vibe>>;
     isCallerAdmin(): Promise<boolean>;
@@ -62,9 +65,4 @@ export interface backendInterface {
     postVibe(mood: string, songTitle: string, artistName: string, message: string | null): Promise<void>;
     saveCallerUserProfile(profile: Profile): Promise<void>;
     updateProfile(username: string, bio: string): Promise<void>;
-    addMoodSong(mood: string, title: string, artist: string, videoId: string): Promise<bigint>;
-    getMoodSongs(mood: string): Promise<Array<MoodSong>>;
-    deleteMoodSong(songId: bigint): Promise<void>;
-    getPublicUsername(user: Principal): Promise<string | null>;
-    _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
 }
