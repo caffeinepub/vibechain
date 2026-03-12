@@ -9,11 +9,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { usePostVibe } from "../hooks/useQueries";
-import {
-  encodeMusicMessage,
-  parseMusicUrl,
-  spotifyEmbedUrl,
-} from "../utils/music";
+import { encodeMusicMessage, parseMusicUrl } from "../utils/music";
 
 const MOODS = [
   { name: "Happy", emoji: "☀️", cls: "mood-happy" },
@@ -47,7 +43,7 @@ export default function PostVibePage() {
     if (val.trim() === "") {
       setUrlError("");
     } else if (!parseMusicUrl(val.trim())) {
-      setUrlError("Paste a Spotify or YouTube URL to embed music.");
+      setUrlError("Paste a valid YouTube URL to embed music.");
     } else {
       setUrlError("");
     }
@@ -87,9 +83,7 @@ export default function PostVibePage() {
     const urlTrimmed = musicUrl.trim();
     let music = urlTrimmed ? parseMusicUrl(urlTrimmed) : null;
     if (urlTrimmed && !music) {
-      toast.error(
-        "Please enter a valid Spotify or YouTube URL, or leave it empty.",
-      );
+      toast.error("Please enter a valid YouTube URL, or leave it empty.");
       return;
     }
     const encodedMessage = encodeMusicMessage(music, message);
@@ -221,26 +215,15 @@ export default function PostVibePage() {
           {/* Music Link Card */}
           <div className="glass-card rounded-2xl p-6 space-y-4">
             <div className="flex items-center gap-3">
-              {/* Spotify + YouTube logos inline */}
-              <div className="flex items-center gap-1.5">
-                <svg
-                  viewBox="0 0 24 24"
-                  className="w-5 h-5"
-                  fill="#1DB954"
-                  aria-hidden="true"
-                >
-                  <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.495 17.316a.75.75 0 0 1-1.032.25c-2.828-1.728-6.39-2.119-10.584-1.161a.75.75 0 1 1-.334-1.463c4.589-1.047 8.523-.596 11.7 1.342a.75.75 0 0 1 .25 1.032zm1.467-3.263a.937.937 0 0 1-1.288.308c-3.236-1.988-8.167-2.565-11.996-1.403a.938.938 0 0 1-.577-1.787c4.375-1.41 9.81-.727 13.553 1.594a.937.937 0 0 1 .308 1.288zm.126-3.399C15.46 8.353 9.374 8.15 5.915 9.201a1.124 1.124 0 1 1-.652-2.15c3.984-1.208 10.617-.975 14.8 1.553a1.124 1.124 0 0 1-1.125 1.95h-.85z" />
-                </svg>
-                <span className="text-muted-foreground text-xs">/</span>
-                <svg
-                  viewBox="0 0 24 24"
-                  className="w-5 h-5"
-                  fill="#FF0000"
-                  aria-hidden="true"
-                >
-                  <path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z" />
-                </svg>
-              </div>
+              {/* YouTube logo */}
+              <svg
+                viewBox="0 0 24 24"
+                className="w-5 h-5"
+                fill="#FF0000"
+                aria-hidden="true"
+              >
+                <path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z" />
+              </svg>
               <span className="font-semibold">Music Link</span>
               <span className="text-muted-foreground text-xs ml-1">
                 (optional)
@@ -252,7 +235,7 @@ export default function PostVibePage() {
                 id="musicUrl"
                 value={musicUrl}
                 onChange={(e) => handleMusicUrlChange(e.target.value)}
-                placeholder="Paste a Spotify or YouTube URL…"
+                placeholder="Paste a YouTube URL to embed music…"
                 className="bg-muted/30 border-border/50 focus:border-primary/50"
                 data-ocid="post.input"
               />
@@ -266,7 +249,7 @@ export default function PostVibePage() {
               )}
             </div>
 
-            {/* Preview */}
+            {/* YouTube Preview */}
             {previewMusic?.kind === "youtube" && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.97 }}
@@ -294,29 +277,6 @@ export default function PostVibePage() {
                     ✓ Ready to embed
                   </p>
                 </div>
-              </motion.div>
-            )}
-
-            {previewMusic?.kind === "spotify" && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.97 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.25 }}
-                className="rounded-xl overflow-hidden"
-                style={{
-                  border:
-                    "1px solid color-mix(in oklch, var(--border) 60%, transparent)",
-                  height: previewMusic.ref.type === "track" ? "80px" : "152px",
-                }}
-              >
-                <iframe
-                  src={spotifyEmbedUrl(previewMusic.ref)}
-                  title="Spotify preview"
-                  allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                  loading="lazy"
-                  className="w-full h-full"
-                  style={{ border: "none", display: "block" }}
-                />
               </motion.div>
             )}
           </div>

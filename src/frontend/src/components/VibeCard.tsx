@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Clock, Music, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 import type { Vibe } from "../backend.d";
-import { parseVibeMessage, spotifyEmbedUrl } from "../utils/music";
+import { parseVibeMessage } from "../utils/music";
 
 const MOOD_CLASSES: Record<string, string> = {
   Happy: "mood-happy",
@@ -155,27 +155,6 @@ export default function VibeCard({
               title={`${vibe.songTitle} – ${vibe.artistName}`}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
-              className="w-full h-full"
-              style={{ border: "none", display: "block" }}
-            />
-          </div>
-        )}
-
-        {/* Spotify embed */}
-        {music?.kind === "spotify" && (
-          <div
-            className="w-full rounded-xl overflow-hidden mb-3"
-            style={{
-              border:
-                "1px solid color-mix(in oklch, var(--mood-color) 35%, transparent)",
-              height: music.ref.type === "track" ? "80px" : "152px",
-            }}
-          >
-            <iframe
-              src={spotifyEmbedUrl(music.ref)}
-              title={`${vibe.songTitle} – ${vibe.artistName} on Spotify`}
-              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-              loading="lazy"
               className="w-full h-full"
               style={{ border: "none", display: "block" }}
             />
